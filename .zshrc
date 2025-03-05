@@ -65,8 +65,26 @@ zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
 alias ls='ls --color'
 alias c='clear'
 
+# Check if a command exists
+command_exists() {
+    command=$1
+    if command -v &>/dev/null; then
+        return true
+    else
+        return false
+    fi
+}
+
 # Shell integrations
+if ! command_exists fzf; then
+    echo "Installing fzf..."
+    /opt/homebrew/bin/brew install fzf
+fi
 source <(fzf --zsh)
+if ! command_exists zoxide; then
+    echo "Installing zoxide..."
+    /opt/homebrew/bin/brew install zoxide
+fi
 eval "$(zoxide init --cmd cd zsh)"
 
 # Android
@@ -75,9 +93,19 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator
 
 # nvm
 export NVM_DIR="$HOME/.nvm"
+
+if ! command_exists nvm; then
+  echo "Installing nvm..."
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+fi
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
+# bun
+if ! command_exists bun; then
+    echo "Installing bun..."
+    curl -fsSL https://bun.sh/install | bash
+fi
 # bun completions
 [ -s "/Users/ruru/.bun/_bun" ] && source "/Users/ruru/.bun/_bun"
 
@@ -86,12 +114,22 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
 # flutter
+if ! command_exists flutter; then
+    echo "Flutter is not installed. Please install it manually and add it to your PATH"
+fi
 export PATH=$PATH:/Users/ruru/Documents/dev/flutter
 
 # rbenv
+if ! command_exists rbenv; then
+    echo "Installing rbenv..."
+    /opt/homebrew/bin/brew install rbenv
+fi
 eval "$(rbenv init - zsh)"
 
 FPATH=~/.rbenv/completions:"$FPATH"
 
 # cargo
+if ! command_exists cargo; then
+    echo "Cargo is not installed. Please install it manually and add it to your PATH"
+fi
 . "$HOME/.cargo/env"
