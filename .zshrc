@@ -97,60 +97,9 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
-# bun
-if ! command -v bun > /dev/null; then
-  if [[ -f "/opt/homebrew/bin/brew" ]] then
-    /opt/homebrew/bin/brew install bun
-  else
-    echo "Installing bun..."
-    curl -o- https://bun.sh/install | bash -s -- 's/(.*)//g;s/\s+$//g;s/(.*)//g' | tr -d '\r' >> /dev/null 2>&1
-    bash -s -- 'echo -ne "bun install script failed."'
-  fi
-fi
-# bun completions
-[ -s "/Users/ruru/.bun/_bun" ] && source "/Users/ruru/.bun/_bun"
-
-# bun   
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
-
-# flutter
-if ! command -v flutter > /dev/null; then
-  if [[ -f "/opt/homebrew/bin/brew" ]] then
-    /opt/homebrew/bin/brew install flutter
-  else
-    echo "Installing flutter..."
-    curl -o- https://docs.flutter.dev/get-started/install/ | bash -s -- 's/(.*)//g;s/\s+$//g;s/(.*)//g' | tr -d '\r' >> /dev/null 2>&1
-    bash -s -- 'echo -ne "flutter install script failed."'
-  fi
-fi
-export PATH=$PATH:/Users/ruru/Documents/dev/flutter
-
-# rbenv
-if ! command -v rbenv > /dev/null; then
-  if [[ -f "/opt/homebrew/bin/brew" ]] then
-    /opt/homebrew/bin/brew install rbenv
-  else
-    echo "Installing rbenv..."
-    curl -o- https://github.com/rbenv/rbenv-build | bash -s -- 's/(.*)//g;s/\s+$//g;s/(.*)//g' | tr -d '\r' >> /dev/null 2>&1
-    bash -s -- 'echo -ne "rbenv install script failed."'
-  fi
-fi
-eval "$(rbenv init - zsh)"
-
-FPATH=~/.rbenv/completions:"$FPATH"
-
-# cargo
-if ! command -v cargo > /dev/null; then
-  if [[ -f "/opt/homebrew/bin/brew" ]] then
-    /opt/homebrew/bin/brew install cargo
-  else
-    echo "Installing cargo..."
-    curl -o- https://doc.rust-lang.org/cargo/getting-started.html | bash -s -- 's/(.*)//g;s/\s+$//g;s/(.*)//g' | tr -d '\r' >> /dev/null 2>&1
-    bash -s -- 'echo -ne "cargo install script failed."'
-  fi
-fi
-. "$HOME/.cargo/env"
+# java
+export JAVA_HOME=/opt/homebrew/opt/openjdk@23
+export PATH=$JAVA_HOME/bin:$PATH
 
 # Bazelisk
 if ! command -v bazel > /dev/null; then
