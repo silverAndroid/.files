@@ -79,6 +79,9 @@ if ! command -v zoxide > /dev/null; then
 fi
 eval "$(zoxide init --cmd cd zsh)"
 
+(nohup brew update > /dev/null) &
+(nohup brew upgrade > /dev/null) &
+
 # Android
 export ANDROID_HOME=$HOME/Library/Android/sdk
 export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.0.13004108
