@@ -81,7 +81,8 @@ eval "$(zoxide init --cmd cd zsh)"
 
 # Android
 export ANDROID_HOME=$HOME/Library/Android/sdk
-export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator
+export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.0.13004108
+export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin
 
 # nvm
 if ! command -v nvm > /dev/null; then
