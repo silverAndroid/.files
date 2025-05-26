@@ -31,7 +31,7 @@ if ! command -v oh-my-posh > /dev/null; then
   # oh-my-posh not found, try to install with brew
   if command -v brew > /dev/null; then
     echo "Attempting to install oh-my-posh using Homebrew..."
-    brew install oh-my-posh
+    brew install jandedobbeleer/oh-my-posh/oh-my-posh # <-- This line is updated
   else
     echo "oh-my-posh not found, and Homebrew is not available to install it."
   fi
