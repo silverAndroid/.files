@@ -1,7 +1,19 @@
-if [[ -f "/opt/homebrew/bin/brew" ]] then
-  # If you're using macOS, you'll want this enabled
-  eval "$(/opt/homebrew/bin/brew shellenv)"
+# --- Determine Brew Command and Setup Environment ---
+BREW_CMD=""
+if command -v brew > /dev/null; then
+  BREW_CMD="brew"
+elif [[ -f "/opt/homebrew/bin/brew" ]]; then
+  BREW_CMD="/opt/homebrew/bin/brew"
+elif [[ -f "/usr/local/bin/brew" ]]; then
+  BREW_CMD="/usr/local/bin/brew"
+elif [[ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
+  BREW_CMD="/home/linuxbrew/.linuxbrew/bin/brew"
 fi
+
+if [[ -n "$BREW_CMD" ]]; then
+  eval "$($BREW_CMD shellenv)"
+fi
+# --- End Brew Command and Setup Environment ---
 
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
@@ -15,7 +27,22 @@ fi
 source "${ZINIT_HOME}/zinit.zsh"
 
 # Load Oh My Posh
-eval "$(oh-my-posh init zsh --config ~/.omp.yaml)"
+if ! command -v oh-my-posh > /dev/null; then
+  # oh-my-posh not found, try to install with brew
+  if command -v brew > /dev/null; then
+    echo "Attempting to install oh-my-posh using Homebrew..."
+    brew install oh-my-posh
+  else
+    echo "oh-my-posh not found, and Homebrew is not available to install it."
+  fi
+fi
+
+# If oh-my-posh is now available (either initially or after installation), initialize it
+if command -v oh-my-posh > /dev/null; then
+  eval "$(oh-my-posh init zsh --config ~/.omp.yaml)"
+else
+  echo "oh-my-posh is not installed or installation failed. Skipping Oh My Posh initialization."
+fi
 
 # Add in zsh plugins
 zinit light zsh-users/zsh-syntax-highlighting
@@ -67,20 +94,29 @@ alias c='clear'
 
 # Shell integrations
 if ! command -v fzf > /dev/null; then
-  if [[ -f "/opt/homebrew/bin/brew" ]] then
-    /opt/homebrew/bin/brew install fzf
+  if command -v brew > /dev/null; then
+    brew install fzf
   fi
 fi
-source <(fzf --zsh)
-if ! command -v zoxide > /dev/null; then
-  if [[ -f "/opt/homebrew/bin/brew" ]] then
-    /opt/homebrew/bin/brew install zoxide
-  fi
+# Ensure fzf is sourced only if available
+if command -v fzf > /dev/null; then
+  source <(fzf --zsh)
 fi
-eval "$(zoxide init --cmd cd zsh)"
 
-(nohup brew update > /dev/null) &
-(nohup brew upgrade > /dev/null) &
+if ! command -v zoxide > /dev/null; then
+  if command -v brew > /dev/null; then
+    brew install zoxide
+  fi
+fi
+# Ensure zoxide is initialized only if available
+if command -v zoxide > /dev/null; then
+  eval "$(zoxide init --cmd cd zsh)"
+fi
+
+if command -v brew > /dev/null; then
+  (nohup brew update > /dev/null) &
+  (nohup brew upgrade > /dev/null) &
+fi
 
 # Android
 export ANDROID_HOME=$HOME/Library/Android/sdk
@@ -89,10 +125,10 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_H
 
 # nvm
 if ! command -v nvm > /dev/null; then
-  if [[ -f "/opt/homebrew/bin/brew" ]] then
-    /opt/homebrew/bin/brew install nvm
+  if command -v brew > /dev/null; then
+    brew install nvm
   else
-    echo "Installing nvm..."
+    echo "Installing nvm via curl..."
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash -s -- 's/(.*)//g;s/\s+$//g;s/(.*)//g' | tr -d '\r' >> /dev/null 2>&1
     bash -s -- 'echo -ne "nvm install script failed."'
   fi
@@ -102,15 +138,23 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 # java
-export JAVA_HOME=/opt/homebrew/opt/openjdk@23
-export PATH=$JAVA_HOME/bin:$PATH
+if command -v brew > /dev/null && brew list openjdk@23 > /dev/null 2>&1; then
+  # If openjdk@23 is installed via brew, set JAVA_HOME to its prefix
+  export JAVA_HOME=$(brew --prefix openjdk@23)
+  export PATH=$JAVA_HOME/bin:$PATH
+elif [[ -d "/opt/homebrew/opt/openjdk@23" ]]; then # Fallback for existing manual Mac M1/M2 setups
+  export JAVA_HOME=/opt/homebrew/opt/openjdk@23
+  export PATH=$JAVA_HOME/bin:$PATH
+fi
+
 
 # Bazelisk
 if ! command -v bazel > /dev/null; then
-  if [[ -f "/opt/homebrew/bin/brew" ]] then
-    /opt/homebrew/bin/brew install bazelisk
+  if command -v brew > /dev/null; then
+    brew install bazelisk
   fi
-  if ! command -v bazel > /dev/null; then
+  if ! command -v bazel > /dev/null; then # If brew install failed or brew is not available
+      echo "Installing Bazelisk via curl..."
       curl -fsSL https://github.com/bazelbuild/bazelisk/releases/download/v1.18.0/bazelisk-1.18.0.tar.gz -o /tmp/bazelisk-1.18.0.tar.gz
       tar -xf /tmp/bazelisk-1.18.0.tar.gz
       chmod +x /tmp/bazelisk-1.18.0
