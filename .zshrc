@@ -16,6 +16,7 @@ fi
 # --- End Brew Command and Setup Environment ---
 
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
+export PATH=$PATH:$(brew --prefix)/bin
 
 # Download Zinit, if it's not there yet
 if [ ! -d "$ZINIT_HOME" ]; then
@@ -26,23 +27,12 @@ fi
 # Source/Load zinit
 source "${ZINIT_HOME}/zinit.zsh"
 
-# Load Oh My Posh
-if ! command -v oh-my-posh > /dev/null; then
-  # oh-my-posh not found, try to install with brew
-  if command -v brew > /dev/null; then
-    echo "Attempting to install oh-my-posh using Homebrew..."
-    brew install jandedobbeleer/oh-my-posh/oh-my-posh # <-- This line is updated
-  else
-    echo "oh-my-posh not found, and Homebrew is not available to install it."
-  fi
-fi
-
 # If oh-my-posh is now available (either initially or after installation), initialize it
-if command -v oh-my-posh > /dev/null; then
-  eval "$(oh-my-posh init zsh --config ~/.omp.yaml)"
-else
-  echo "oh-my-posh is not installed or installation failed. Skipping Oh My Posh initialization."
+OH_MY_POSH_CMD="oh-my-posh"
+if [[ -f "$HOME/.local/bin/oh-my-posh" ]]; then
+  OH_MY_POSH_CMD="$HOME/.local/bin/oh-my-posh"
 fi
+eval "$($OH_MY_POSH_CMD init zsh --config ~/.omp.yaml)"
 
 # Add in zsh plugins
 zinit light zsh-users/zsh-syntax-highlighting

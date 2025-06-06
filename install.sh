@@ -32,6 +32,7 @@ if ! command -v brew &> /dev/null; then
     if [ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]; then
         echo "Adding Homebrew (Linuxbrew) to PATH for this session..."
         eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+        sudo apt-get install build-essential procps curl file git
     fi
 
     if ! command -v brew &> /dev/null; then
@@ -60,6 +61,9 @@ else
     echo "WARNING: Brewfile not found in the current directory. Skipping package installation from Brewfile."
 fi
 # --- End Brewfile Package Installation ---
+
+# --- Install Oh My Posh ---
+curl -s https://ohmyposh.dev/install.sh | bash -s
 
 # --- Check and Install Stow ---
 echo "Checking for Stow..."

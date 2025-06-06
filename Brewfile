@@ -1,7 +1,6 @@
 # Brewfile for silverAndroid/.files
 
 # Shell essentials & theming
-brew "jandedobbeleer/oh-my-posh/oh-my-posh"
 brew "fzf"
 brew "zoxide"
 
