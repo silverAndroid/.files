@@ -17,11 +17,11 @@ fi
 
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 export PATH=$PATH:$(brew --prefix)/bin
+export PATH=$PATH:/home/ruru/.local/bin
 
 # Download Zinit, if it's not there yet
 if [ ! -d "$ZINIT_HOME" ]; then
-   mkdir -p "$(dirname $ZINIT_HOME)"
-   git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
+   bash -c "$(curl --fail --show-error --silent --location https://raw.githubusercontent.com/zdharma-continuum/zinit/HEAD/scripts/install.sh)"
 fi
 
 # Source/Load zinit
@@ -115,13 +115,8 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_H
 
 # nvm
 if ! command -v nvm > /dev/null; then
-  if command -v brew > /dev/null; then
-    brew install nvm
-  else
     echo "Installing nvm via curl..."
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash -s -- 's/(.*)//g;s/\s+$//g;s/(.*)//g' | tr -d '\r' >> /dev/null 2>&1
-    bash -s -- 'echo -ne "nvm install script failed."'
-  fi
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash -- 's/(.*)//g;s/\s+$//g;s/(.*)//g' | tr -d '\r' >> /dev/null 2>&1
 fi
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
@@ -154,3 +149,24 @@ if ! command -v bazel > /dev/null; then
   fi
   export PATH="$HOME/bin/bazelisk:$PATH"
 fi
+
+# Load a few important annexes, without Turbo
+# (this is currently required for annexes)
+zinit light-mode for \
+    zdharma-continuum/zinit-annex-as-monitor \
+    zdharma-continuum/zinit-annex-bin-gem-node \
+    zdharma-continuum/zinit-annex-patch-dl \
+    zdharma-continuum/zinit-annex-rust
+
+### End of Zinit's installer chunk
+### End of Zinit's installer chunk
+
+# Load a few important annexes, without Turbo
+# (this is currently required for annexes)
+zinit light-mode for \
+    zdharma-continuum/zinit-annex-as-monitor \
+    zdharma-continuum/zinit-annex-bin-gem-node \
+    zdharma-continuum/zinit-annex-patch-dl \
+    zdharma-continuum/zinit-annex-rust
+
+### End of Zinit's installer chunk
