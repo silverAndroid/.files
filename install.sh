@@ -52,7 +52,10 @@ echo "Installing packages from Brewfile..."
 if [ -f "./Brewfile" ]; then
     if command -v brew &> /dev/null; then
         echo "Using Homebrew to install packages from Brewfile..."
-        brew bundle install --file=./Brewfile
+        brew install fzf
+        brew install zoxide
+        brew install "openjdk@23"
+        brew install bazelisk
         echo "Brewfile packages installation attempt complete."
     else
         echo "WARNING: Homebrew is not available, cannot install packages from Brewfile."
