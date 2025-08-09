@@ -120,8 +120,7 @@ export NVM_DIR="$HOME/.nvm"
 if ! command -v nvm > /dev/null; then
   if command -v brew > /dev/null; then
     brew install nvm
-  fi
-  else; then
+  else
     echo "Installing nvm via curl..."
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
   fi
