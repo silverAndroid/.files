@@ -13,13 +13,7 @@ echo "Starting installation for silverAndroid/.files..."
 
 # --- Helper Functions ---
 is_ubuntu() {
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        if [ "$ID" = "ubuntu" ]; then
-            return 0 # 0 is true in bash
-        fi
-    fi
-    return 1 # 1 is false
+    [ -f /etc/os-release ] && . /etc/os-release && [ "$ID" = "ubuntu" ]
 }
 
 # --- Check and Install Homebrew ---
@@ -86,7 +80,13 @@ if is_ubuntu; then
     sudo apt-get install -y zsh
     echo "Setting zsh as the default shell..."
     if [ -x "$(command -v zsh)" ]; then
-        chsh -s "$(command -v zsh)"
+        ZSH_PATH=$(command -v zsh)
+        # Add zsh to /etc/shells if it's not already there
+        if ! grep -Fxq "$ZSH_PATH" /etc/shells; then
+            echo "Adding $ZSH_PATH to /etc/shells..."
+            echo "$ZSH_PATH" | sudo tee -a /etc/shells
+        fi
+        chsh -s "$ZSH_PATH"
         echo "Default shell changed to zsh. Please log out and back in for the change to take effect."
     else
         echo "WARNING: zsh installation seems to have failed. Skipping setting it as default shell."
@@ -98,16 +98,14 @@ if is_ubuntu; then
     sudo apt-get install -y mosh
 
     echo "Configuring firewall for Mosh..."
-    # Check if ufw is installed, and install it if it is not.
+    # Install ufw if not present
     if ! command -v ufw &> /dev/null; then
         echo "ufw not found. Installing..."
         sudo apt-get install -y ufw
     fi
 
-    # Now, configure ufw.
-    # We check again in case installation failed.
+    # Configure ufw if available
     if command -v ufw &> /dev/null; then
-        echo "Configuring ufw for Mosh..."
         sudo ufw allow 60000:61000/udp
         if ! sudo ufw status | grep -q "Status: active"; then
             echo "ufw is inactive. Enabling..."
