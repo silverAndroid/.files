@@ -133,26 +133,25 @@ jobs:
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
-      - name: 'Run Gemini PR Review'
-        uses: 'google-github-actions/run-gemini-cli@v0'
-        id: 'gemini_pr_review'
+      - name: 'Get npm global path'
+        id: npm-global-path
+        run: |
+          echo "path=$(npm prefix -g)" >> $GITHUB_OUTPUT
+      - name: 'Cache Gemini CLI'
+        uses: actions/cache@v4
+        id: gemini-cli-cache
+        with:
+          path: ${{ steps.npm-global-path.outputs.path }}
+          key: ${{ runner.os }}-gemini-cli-${{ vars.GEMINI_CLI_VERSION || 'latest' }}
+
+      - name: 'Configure Gemini CLI'
+        run: |-
+          mkdir -p .gemini/
+          echo "${SETTINGS}" > ".gemini/settings.json"
+        shell: 'bash'
         env:
           GITHUB_TOKEN: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
-          PR_NUMBER: '${{ steps.get_pr.outputs.pr_number }}'
-          PR_DATA: '${{ steps.get_pr.outputs.pr_data }}'
-          CHANGED_FILES: '${{ steps.get_pr.outputs.changed_files }}'
-          ADDITIONAL_INSTRUCTIONS: '${{ steps.get_pr.outputs.additional_instructions }}'
-          REPOSITORY: '${{ github.repository }}'
-        with:
-          gemini_cli_version: '${{ vars.GEMINI_CLI_VERSION }}'
-          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
-          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
-          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
-          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
-          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
-          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
-          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
-          settings: |-
+          SETTINGS: |-
             {
               "debug": ${{ fromJSON(env.DEBUG || env.ACTIONS_STEP_DEBUG || false) }},
               "maxSessionTurns": 20,
@@ -191,7 +190,104 @@ jobs:
                 "target": "gcp"
               }
             }
-          prompt: '${{ steps.prompt.outputs.prompt_text }}'
+
+      - name: 'Authenticate to Google Cloud'
+        if: |-
+          ${{ vars.GCP_WIF_PROVIDER != '' }}
+        id: 'auth'
+        uses: 'google-github-actions/auth@v2' # ratchet:exclude
+        with:
+          project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          token_format: 'access_token'
+          access_token_scopes: 'https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/userinfo.email,https://www.googleapis.com/auth/userinfo.profile'
+
+      - name: 'Install Gemini CLI'
+        id: 'install'
+        if: steps.gemini-cli-cache.outputs.cache-hit != 'true'
+        env:
+          GEMINI_CLI_VERSION: '${{ vars.GEMINI_CLI_VERSION }}'
+        shell: 'bash'
+        run: |-
+          set -euo pipefail
+
+          VERSION_INPUT="${GEMINI_CLI_VERSION:-latest}"
+
+          if [[ "${VERSION_INPUT}" == "latest" || "${VERSION_INPUT}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.-]+)?(\+[a-zA-Z0-9\.-]+)?$ ]]; then
+            echo "Installing Gemini CLI from npm: @google/gemini-cli@${VERSION_INPUT}"
+            npm install --silent --no-audit --prefer-offline --global @google/gemini-cli@"${VERSION_INPUT}"
+          else
+            echo "Installing Gemini CLI from GitHub: github:google-gemini/gemini-cli#${VERSION_INPUT}"
+            git clone https://github.com/google-gemini/gemini-cli.git
+            cd gemini-cli
+            git checkout "${VERSION_INPUT}"
+            npm install
+            npm run bundle
+            npm install --silent --no-audit --prefer-offline --global .
+          fi
+          echo "Verifying installation:"
+          if command -v gemini >/dev/null 2>&1; then
+            gemini --version || echo "Gemini CLI installed successfully (version command not available)"
+          else
+            echo "Error: Gemini CLI not found in PATH"
+            exit 1
+          fi
+
+      - name: 'Run Gemini CLI'
+        id: 'gemini_pr_review'
+        shell: 'bash'
+        run: |-
+          set -euo pipefail
+
+          # Unset GEMINI_API_KEY if empty
+          if [ -z "${GEMINI_API_KEY}" ]; then
+            unset GEMINI_API_KEY
+          fi
+
+          # Create a temporary directory for storing the output, and ensure it's
+          # cleaned up later
+          TEMP_OUTPUT="$(mktemp -p "${RUNNER_TEMP}" gemini.XXXXXXXXXX)"
+          function cleanup {
+            rm -f "${TEMP_OUTPUT}"
+          }
+          trap cleanup EXIT
+
+          # Run Gemini CLI with the provided prompt
+          if ! gemini --yolo --prompt "${PROMPT}" &> "${TEMP_OUTPUT}"; then
+            GEMINI_RESPONSE="$(cat "${TEMP_OUTPUT}")"
+            FIRST_LINE="$(echo "${GEMINI_RESPONSE}" | head -n1)"
+            echo "::error title=Gemini CLI execution failed::${FIRST_LINE}"
+            echo "${GEMINI_RESPONSE}"
+            exit 1
+          fi
+
+          GEMINI_RESPONSE="$(cat "${TEMP_OUTPUT}")"
+
+          # Print the response
+          echo "::group::Gemini response"
+          echo "${GEMINI_RESPONSE}"
+          echo "::endgroup::"
+
+          # Set the captured response as a step output, supporting multiline
+          echo "gemini_response<<EOF" >> "${GITHUB_OUTPUT}"
+          echo "${GEMINI_RESPONSE}" >> "${GITHUB_OUTPUT}"
+          echo "EOF" >> "${GITHUB_OUTPUT}"
+        env:
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          PR_NUMBER: '${{ steps.get_pr.outputs.pr_number }}'
+          PR_DATA: '${{ steps.get_pr.outputs.pr_data }}'
+          CHANGED_FILES: '${{ steps.get_pr.outputs.changed_files }}'
+          ADDITIONAL_INSTRUCTIONS: '${{ steps.get_pr.outputs.additional_instructions }}'
+          REPOSITORY: '${{ github.repository }}'
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          SURFACE: 'GitHub'
+          GOOGLE_CLOUD_PROJECT: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          GOOGLE_GENAI_USE_VERTEXAI: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          GOOGLE_GENAI_USE_GCA: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          GOOGLE_CLOUD_ACCESS_TOKEN: '${{steps.auth.outputs.access_token}}'
+          PROMPT: '${{ steps.prompt.outputs.prompt_text }}'
 
 
       - name: 'Post PR review failure comment'
