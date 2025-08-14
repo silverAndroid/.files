@@ -66,9 +66,36 @@ fi
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     if [ "$ID" = "ubuntu" ]; then
-        echo "Ubuntu detected. Installing unzip..."
+        echo "Ubuntu detected. Installing dependencies..."
         sudo apt-get update
-        sudo apt-get install -y unzip
+        sudo apt-get install -y unzip # for oh-my-posh
+
+        # --- Set up Mosh Server ---
+        echo "Installing Mosh server..."
+        sudo apt-get install -y mosh
+
+        echo "Configuring firewall for Mosh..."
+        # Check if ufw is installed, and install it if it is not.
+        if ! command -v ufw &> /dev/null; then
+            echo "ufw not found. Installing..."
+            sudo apt-get install -y ufw
+        fi
+
+        # Now, configure ufw.
+        # We check again in case installation failed.
+        if command -v ufw &> /dev/null; then
+            echo "Configuring ufw for Mosh..."
+            sudo ufw allow 60000:61000/udp
+            if ! sudo ufw status | grep -q "Status: active"; then
+                echo "ufw is inactive. Enabling..."
+                sudo ufw --force enable
+            fi
+            echo "ufw configured for Mosh."
+        else
+            echo "WARNING: ufw could not be installed. Skipping firewall configuration."
+            echo "Please manually open UDP ports 60000-61000 for Mosh to work."
+        fi
+        # --- End Mosh Server Setup ---
     fi
 fi
 curl -s https://ohmyposh.dev/install.sh | bash -s
