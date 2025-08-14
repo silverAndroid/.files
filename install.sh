@@ -66,6 +66,15 @@ fi
 # --- End Brewfile Package Installation ---
 
 # --- Install Oh My Posh ---
+# Install unzip on Ubuntu, as it is required by oh-my-posh installer
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    if [ "$ID" = "ubuntu" ]; then
+        echo "Ubuntu detected. Installing unzip..."
+        sudo apt-get update
+        sudo apt-get install -y unzip
+    fi
+fi
 curl -s https://ohmyposh.dev/install.sh | bash -s
 
 # --- Check and Install Stow ---
