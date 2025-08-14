@@ -7,6 +7,18 @@
 # 2. Install packages from the Brewfile.
 # 3. Check for and install Stow if not present.
 # 4. Run stow to link the dotfiles from the current directory.
+# 5. On Ubuntu, install zsh and set it as the default shell.
+
+# --- Helper Functions ---
+is_ubuntu() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        if [ "$ID" = "ubuntu" ]; then
+            return 0 # 0 is success in shell scripting
+        fi
+    fi
+    return 1 # 1 is failure
+}
 
 echo "Starting installation for silverAndroid/.files..."
 
@@ -60,6 +72,16 @@ else
     echo "WARNING: Homebrew is not available, cannot install packages."
 fi
 # --- End Homebrew Package Installation ---
+
+# --- OS-specific Prerequisite Installation ---
+if is_ubuntu; then
+    echo "Ubuntu detected. Installing prerequisites..."
+    sudo apt-get update
+    # Install unzip on Ubuntu, as it is required by oh-my-posh installer
+    sudo apt-get install -y unzip
+    echo "Installing zsh..."
+    sudo apt-get install -y zsh
+fi
 
 # --- Install Oh My Posh ---
 # Install unzip on Ubuntu, as it is required by oh-my-posh installer
@@ -153,5 +175,21 @@ else
     fi
 fi
 # --- End Run Stow ---
+
+# --- Set Default Shell on Ubuntu ---
+if is_ubuntu; then
+    if command -v zsh &> /dev/null; then
+        echo "Setting zsh as the default shell..."
+        # The following command might prompt for a password
+        if chsh -s "$(which zsh)"; then
+            echo "Default shell changed to zsh."
+            echo "You may need to log out and log back in for the change to take full effect."
+        else
+            echo "Failed to change the default shell. Please try running 'chsh -s \$(which zsh)' manually."
+        fi
+    else
+        echo "WARNING: zsh is not installed, so it cannot be set as the default shell."
+    fi
+fi
 
 # (Rest of the script will follow)
