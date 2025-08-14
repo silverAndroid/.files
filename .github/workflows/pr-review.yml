@@ -126,6 +126,15 @@ jobs:
             echo "EOF"
           } >> "${GITHUB_OUTPUT}"
 
+      - name: 'Load prompt'
+        id: 'prompt'
+        run: |
+          {
+            echo 'prompt_text<<EOF'
+            cat .github/workflows/gemini-prompt.txt
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: 'Run Gemini PR Review'
         uses: 'google-github-actions/run-gemini-cli@v0'
         id: 'gemini_pr_review'
@@ -184,8 +193,7 @@ jobs:
                 "target": "gcp"
               }
             }
-          prompt: |
-            $(cat .github/workflows/gemini-prompt.txt)
+          prompt: '${{ steps.prompt.outputs.prompt_text }}'
 
 
       - name: 'Post PR review failure comment'
