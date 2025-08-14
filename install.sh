@@ -7,8 +7,20 @@
 # 2. Install packages from the Brewfile.
 # 3. Check for and install Stow if not present.
 # 4. Run stow to link the dotfiles from the current directory.
+# 5. On Ubuntu, install zsh and set it as the default shell.
 
 echo "Starting installation for silverAndroid/.files..."
+
+# --- Helper Functions ---
+is_ubuntu() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        if [ "$ID" = "ubuntu" ]; then
+            return 0 # 0 is true in bash
+        fi
+    fi
+    return 1 # 1 is false
+}
 
 # --- Check and Install Homebrew ---
 echo "Checking for Homebrew..."
@@ -61,43 +73,56 @@ else
 fi
 # --- End Homebrew Package Installation ---
 
-# --- Install Oh My Posh ---
-# Install unzip on Ubuntu, as it is required by oh-my-posh installer
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    if [ "$ID" = "ubuntu" ]; then
-        echo "Ubuntu detected. Installing dependencies..."
-        sudo apt-get update
-        sudo apt-get install -y unzip # for oh-my-posh
+# --- Ubuntu Specific Setup ---
+if is_ubuntu; then
+    echo "Ubuntu detected. Running Ubuntu-specific setup..."
+    sudo apt-get update
 
-        # --- Set up Mosh Server ---
-        echo "Installing Mosh server..."
-        sudo apt-get install -y mosh
+    # Install unzip, as it is required by oh-my-posh installer
+    sudo apt-get install -y unzip
 
-        echo "Configuring firewall for Mosh..."
-        # Check if ufw is installed, and install it if it is not.
-        if ! command -v ufw &> /dev/null; then
-            echo "ufw not found. Installing..."
-            sudo apt-get install -y ufw
-        fi
-
-        # Now, configure ufw.
-        # We check again in case installation failed.
-        if command -v ufw &> /dev/null; then
-            echo "Configuring ufw for Mosh..."
-            sudo ufw allow 60000:61000/udp
-            if ! sudo ufw status | grep -q "Status: active"; then
-                echo "ufw is inactive. Enabling..."
-                sudo ufw --force enable
-            fi
-            echo "ufw configured for Mosh."
-        else
-            echo "WARNING: ufw could not be installed. Skipping firewall configuration."
-            echo "Please manually open UDP ports 60000-61000 for Mosh to work."
-        fi
-        # --- End Mosh Server Setup ---
+    # --- Install zsh and set as default shell ---
+    echo "Installing zsh..."
+    sudo apt-get install -y zsh
+    echo "Setting zsh as the default shell..."
+    if [ -x "$(command -v zsh)" ]; then
+        chsh -s "$(command -v zsh)"
+        echo "Default shell changed to zsh. Please log out and back in for the change to take effect."
+    else
+        echo "WARNING: zsh installation seems to have failed. Skipping setting it as default shell."
     fi
+    # --- End zsh Setup ---
+
+    # --- Set up Mosh Server ---
+    echo "Installing Mosh server..."
+    sudo apt-get install -y mosh
+
+    echo "Configuring firewall for Mosh..."
+    # Check if ufw is installed, and install it if it is not.
+    if ! command -v ufw &> /dev/null; then
+        echo "ufw not found. Installing..."
+        sudo apt-get install -y ufw
+    fi
+
+    # Now, configure ufw.
+    # We check again in case installation failed.
+    if command -v ufw &> /dev/null; then
+        echo "Configuring ufw for Mosh..."
+        sudo ufw allow 60000:61000/udp
+        if ! sudo ufw status | grep -q "Status: active"; then
+            echo "ufw is inactive. Enabling..."
+            sudo ufw --force enable
+        fi
+        echo "ufw configured for Mosh."
+    else
+        echo "WARNING: ufw could not be installed. Skipping firewall configuration."
+        echo "Please manually open UDP ports 60000-61000 for Mosh to work."
+    fi
+    # --- End Mosh Server Setup ---
 fi
+# --- End Ubuntu Specific Setup ---
+
+# --- Install Oh My Posh ---
 curl -s https://ohmyposh.dev/install.sh | bash -s
 
 # --- Check and Install Stow ---
