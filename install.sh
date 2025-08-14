@@ -86,7 +86,7 @@ if is_ubuntu; then
             echo "Adding $ZSH_PATH to /etc/shells..."
             echo "$ZSH_PATH" | sudo tee -a /etc/shells
         fi
-        sudo chsh -s "$ZSH_PATH"
+        sudo chsh -s "$ZSH_PATH" "${SUDO_USER:-$USER}"
         echo "Default shell changed to zsh. Please log out and back in for the change to take effect."
     else
         echo "WARNING: zsh installation seems to have failed. Skipping setting it as default shell."
