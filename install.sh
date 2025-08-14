@@ -47,23 +47,19 @@ else
 fi
 # --- End Homebrew Check ---
 
-# --- Install Packages from Brewfile ---
-echo "Installing packages from Brewfile..."
-if [ -f "./Brewfile" ]; then
-    if command -v brew &> /dev/null; then
-        echo "Using Homebrew to install packages from Brewfile..."
-        brew install fzf
-        brew install zoxide
-        brew install "openjdk@23"
-        brew install bazelisk
-        echo "Brewfile packages installation attempt complete."
-    else
-        echo "WARNING: Homebrew is not available, cannot install packages from Brewfile."
-    fi
+# --- Install Homebrew Packages ---
+echo "Installing Homebrew packages..."
+if command -v brew &> /dev/null; then
+    echo "Using Homebrew to install packages..."
+    brew install fzf
+    brew install zoxide
+    brew install "openjdk@23"
+    brew install bazelisk
+    echo "Homebrew package installation attempt complete."
 else
-    echo "WARNING: Brewfile not found in the current directory. Skipping package installation from Brewfile."
+    echo "WARNING: Homebrew is not available, cannot install packages."
 fi
-# --- End Brewfile Package Installation ---
+# --- End Homebrew Package Installation ---
 
 # --- Install Oh My Posh ---
 # Install unzip on Ubuntu, as it is required by oh-my-posh installer
