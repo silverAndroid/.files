@@ -26,8 +26,6 @@ WORKDIR /home/user
 # Install Homebrew
 RUN CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
-RUN echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /home/user/.zshrc && \
-    echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /home/user/.bashrc
 
 
 # Install packages with Homebrew
@@ -46,6 +44,10 @@ COPY --chown=user:user . /home/user/dotfiles
 WORKDIR /home/user/dotfiles
 RUN stow .
 WORKDIR /home/user
+
+# Set up shell environment
+RUN echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /home/user/.zshrc && \
+    echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /home/user/.bashrc
 
 # Set the default shell to zsh for the user
 RUN sudo chsh -s /usr/bin/zsh user
