@@ -70,7 +70,7 @@ jobs:
           contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.review.author_association)
         )
       )
-    timeout-minutes: 5
+    timeout-minutes: 15
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Checkout PR code'
