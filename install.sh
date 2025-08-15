@@ -106,6 +106,7 @@ if is_ubuntu; then
 
     # Configure ufw if available
     if command -v ufw &> /dev/null; then
+        sudo ufw allow ssh
         sudo ufw allow 60000:61000/udp
         if ! sudo ufw status | grep -q "Status: active"; then
             echo "ufw is inactive. Enabling..."

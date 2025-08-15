@@ -163,4 +163,3 @@ zinit light-mode for \
     zdharma-continuum/zinit-annex-rust
 
 ### End of Zinit's installer chunk
-### End of Zinit's installer chunk
