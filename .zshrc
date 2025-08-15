@@ -19,11 +19,6 @@ ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 export PATH=$PATH:$(brew --prefix)/bin
 export PATH=$PATH:/home/ruru/.local/bin
 
-# Download Zinit, if it's not there yet
-if [ ! -d "$ZINIT_HOME" ]; then
-   bash -c "$(curl --fail --show-error --silent --location https://raw.githubusercontent.com/zdharma-continuum/zinit/HEAD/scripts/install.sh)"
-fi
-
 # Source/Load zinit
 source "${ZINIT_HOME}/zinit.zsh"
 
@@ -83,21 +78,11 @@ alias ls='ls --color'
 alias c='clear'
 
 # Shell integrations
-if ! command -v fzf > /dev/null; then
-  if command -v brew > /dev/null; then
-    brew install fzf
-  fi
-fi
 # Ensure fzf is sourced only if available
 if command -v fzf > /dev/null; then
   source <(fzf --zsh)
 fi
 
-if ! command -v zoxide > /dev/null; then
-  if command -v brew > /dev/null; then
-    brew install zoxide
-  fi
-fi
 # Ensure zoxide is initialized only if available
 if command -v zoxide > /dev/null; then
   eval "$(zoxide init --cmd cd zsh)"
@@ -116,16 +101,6 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_H
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
-# nvm
-if ! command -v nvm > /dev/null; then
-  if command -v brew > /dev/null; then
-    brew install nvm
-  else
-    echo "Installing nvm via curl..."
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-  fi
-fi
-
 # java
 if command -v brew > /dev/null && brew list openjdk@23 > /dev/null 2>&1; then
   # If openjdk@23 is installed via brew, set JAVA_HOME to its prefix
@@ -136,23 +111,6 @@ elif [[ -d "/opt/homebrew/opt/openjdk@23" ]]; then # Fallback for existing manua
   export PATH=$JAVA_HOME/bin:$PATH
 fi
 
-
-# Bazelisk
-if ! command -v bazel > /dev/null; then
-  if command -v brew > /dev/null; then
-    brew install bazelisk
-  fi
-  if ! command -v bazel > /dev/null; then # If brew install failed or brew is not available
-      echo "Installing Bazelisk via curl..."
-      curl -fsSL https://github.com/bazelbuild/bazelisk/releases/download/v1.18.0/bazelisk-1.18.0.tar.gz -o /tmp/bazelisk-1.18.0.tar.gz
-      tar -xf /tmp/bazelisk-1.18.0.tar.gz
-      chmod +x /tmp/bazelisk-1.18.0
-      mv /tmp/bazelisk-1.18.0 "$HOME/bin/bazelisk"
-      rm /tmp/bazelisk-1.18.0.tar.gz
-      echo "Bazelisk installed successfully!"
-  fi
-  export PATH="$HOME/bin/bazelisk:$PATH"
-fi
 
 # Load a few important annexes, without Turbo
 # (this is currently required for annexes)
