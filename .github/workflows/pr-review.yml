@@ -184,7 +184,8 @@ jobs:
                 "run_shell_command(cat)",
                 "run_shell_command(head)",
                 "run_shell_command(tail)",
-                "run_shell_command(grep)"
+                "run_shell_command(grep)",
+                "run_shell_command(git)"
               ],
               "telemetry": {
                 "enabled": false,
