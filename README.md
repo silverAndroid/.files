@@ -40,12 +40,12 @@ This repository provides a Docker image with the complete environment pre-config
 
 2.  **Pull the Docker image from GHCR:**
     ```bash
-    docker pull ghcr.io/silverandroid/.files:latest
+    docker pull ghcr.io/silverandroid/dotfiles:latest
     ```
 
 3.  **Run the Docker container:**
     ```bash
-    docker run -d --name dotfiles ghcr.io/silverandroid/.files:latest
+    docker run -d --name dotfiles ghcr.io/silverandroid/dotfiles:latest
     ```
     This will start a container in detached mode with the name `dotfiles`.
 
