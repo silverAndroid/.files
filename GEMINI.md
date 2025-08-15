@@ -12,6 +12,7 @@ Key characteristics of this repository:
 - **Automated Setup**: An `install.sh` script is provided to automate the setup process, including installing Homebrew, required packages, and running `stow`.
 - **Manual Setup**: Manual installation instructions are also available for users who prefer more control.
 - **Zsh Plugins**: Zsh plugins are managed by `zinit` within the `.zshrc` file.
+- **Docker Image**: A `Dockerfile` is provided to create a containerized version of this environment. It is important to keep the `Dockerfile` and the `install.sh` script in sync. Any changes to dependencies or installation steps should be reflected in both files.
 
 When reviewing pull requests, please consider the following:
 - Changes should be consistent with the existing dotfile structure.
