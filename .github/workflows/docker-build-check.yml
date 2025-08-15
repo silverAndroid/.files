@@ -26,6 +26,6 @@ jobs:
         with:
           context: .
           push: false
-          tags: ghcr.io/${{ github.repository }}/pr-${{ github.event.number }}:latest
+          tags: ghcr.io/${{ toLower(github.repository) }}/pr-${{ github.event.number }}:latest
           cache-from: type=gha,scope=${{ github.workflow }}
           cache-to: type=gha,scope=${{ github.workflow }},mode=max
