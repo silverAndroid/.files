@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
 # Create a non-root user and add it to the sudo group
 RUN useradd -m -s /bin/bash -G sudo user
 RUN echo "user:user" | chpasswd
+RUN echo "user ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 USER user
 WORKDIR /home/user
 
@@ -43,7 +44,9 @@ RUN curl -s https://ohmyposh.dev/install.sh | bash -s
 COPY --chown=user:user . /home/user/dotfiles
 
 # Run stow
-RUN cd dotfiles && stow .
+WORKDIR /home/user/dotfiles
+RUN stow .
+WORKDIR /home/user
 
 # Set the default shell to zsh for the user
 RUN sudo chsh -s /usr/bin/zsh user
