@@ -61,11 +61,47 @@ if command -v brew &> /dev/null; then
     brew install zoxide
     brew install "openjdk@23"
     brew install bazelisk
+    brew install nvm
     echo "Homebrew package installation attempt complete."
 else
     echo "WARNING: Homebrew is not available, cannot install packages."
 fi
 # --- End Homebrew Package Installation ---
+
+# --- Install Fallbacks & Other Tools ---
+
+# Bazelisk
+if ! command -v bazel > /dev/null; then
+    echo "Installing Bazelisk via curl as fallback..."
+    curl -fsSL https://github.com/bazelbuild/bazelisk/releases/download/v1.18.0/bazelisk-1.18.0.tar.gz -o /tmp/bazelisk-1.18.0.tar.gz
+    tar -xf /tmp/bazelisk-1.18.0.tar.gz
+    chmod +x /tmp/bazelisk-1.18.0
+    mkdir -p "$HOME/bin"
+    mv /tmp/bazelisk-1.18.0 "$HOME/bin/bazelisk"
+    rm /tmp/bazelisk-1.18.0.tar.gz
+    echo "Bazelisk installed successfully!"
+fi
+
+# NVM
+if ! command -v nvm > /dev/null; then
+    echo "Installing nvm via curl as fallback..."
+    export NVM_DIR="$HOME/.nvm"
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+fi
+# Create nvm directory, the nvm installer might create it, but -p makes it safe
+mkdir -p "$HOME/.nvm"
+
+# Zinit
+echo "Installing Zinit..."
+ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
+if [ ! -d "$ZINIT_HOME" ]; then
+   bash -c "$(curl --fail --show-error --silent --location https://raw.githubusercontent.com/zdharma-continuum/zinit/HEAD/scripts/install.sh)"
+   echo "Zinit installed."
+else
+   echo "Zinit is already installed."
+fi
+
+# --- End Fallbacks & Other Tools ---
 
 # --- Ubuntu Specific Setup ---
 if is_ubuntu; then
