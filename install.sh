@@ -57,11 +57,7 @@ fi
 echo "Installing Homebrew packages..."
 if command -v brew &> /dev/null; then
     echo "Using Homebrew to install packages..."
-    brew install fzf
-    brew install zoxide
-    brew install "openjdk@21"
-    brew install bazelisk
-    brew install nvm
+    brew install fzf zoxide "openjdk@21" bazelisk nvm glances
     echo "Homebrew package installation attempt complete."
 else
     echo "WARNING: Homebrew is not available, cannot install packages."
