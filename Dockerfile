@@ -1,5 +1,5 @@
 # Use Ubuntu as the base image
-FROM ubuntu:latest
+FROM ubuntu:22.04
 
 # Set non-interactive frontend for package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -14,7 +14,8 @@ RUN apt-get update && apt-get install -y \
     sudo \
     unzip \
     zsh \
-    mosh
+    mosh \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user and add it to the sudo group
 RUN useradd -m -s /bin/bash -G sudo user
