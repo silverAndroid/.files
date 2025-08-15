@@ -31,6 +31,30 @@ The script will:
 *   Check for and install [Stow](https://www.gnu.org/software/stow/) if it's not already present.
 *   Run `stow .` from within the repository's root directory to create symbolic links (typically to your home directory, if you cloned to `~/dotfiles`).
 
+## Docker-based Installation (Recommended for VPS)
+
+This repository provides a Docker image with the complete environment pre-configured. This is the recommended way to set up the dotfiles on a new VPS.
+
+1.  **Install Docker:**
+    Ensure that Docker is installed on your system. You can follow the official Docker installation instructions for your OS.
+
+2.  **Pull the Docker image from GHCR:**
+    ```bash
+    docker pull ghcr.io/silverandroid/dotfiles:latest
+    ```
+
+3.  **Run the Docker container:**
+    ```bash
+    docker run -d --name dotfiles ghcr.io/silverandroid/dotfiles:latest
+    ```
+    This will start a container in detached mode with the name `dotfiles`.
+
+4.  **Connect to the container:**
+    ```bash
+    docker exec -it dotfiles /bin/zsh
+    ```
+    You will now be in a `zsh` shell with the complete environment set up.
+
 ## Manual Installation
 
 If you prefer to set things up manually, you will need to:

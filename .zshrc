@@ -102,12 +102,12 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 # java
-if command -v brew > /dev/null && brew list openjdk@23 > /dev/null 2>&1; then
-  # If openjdk@23 is installed via brew, set JAVA_HOME to its prefix
-  export JAVA_HOME=$(brew --prefix openjdk@23)
+if command -v brew > /dev/null && brew list openjdk@21 > /dev/null 2>&1; then
+  # If openjdk@21 is installed via brew, set JAVA_HOME to its prefix
+  export JAVA_HOME=$(brew --prefix openjdk@21)
   export PATH=$JAVA_HOME/bin:$PATH
-elif [[ -d "/opt/homebrew/opt/openjdk@23" ]]; then # Fallback for existing manual Mac M1/M2 setups
-  export JAVA_HOME=/opt/homebrew/opt/openjdk@23
+elif [[ -d "/opt/homebrew/opt/openjdk@21" ]]; then # Fallback for existing manual Mac M1/M2 setups
+  export JAVA_HOME=/opt/homebrew/opt/openjdk@21
   export PATH=$JAVA_HOME/bin:$PATH
 fi
 

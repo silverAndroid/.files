@@ -59,7 +59,7 @@ if command -v brew &> /dev/null; then
     echo "Using Homebrew to install packages..."
     brew install fzf
     brew install zoxide
-    brew install "openjdk@23"
+    brew install "openjdk@21"
     brew install bazelisk
     brew install nvm
     echo "Homebrew package installation attempt complete."
@@ -90,16 +90,6 @@ if ! command -v nvm > /dev/null; then
 fi
 # Create nvm directory, the nvm installer might create it, but -p makes it safe
 mkdir -p "$HOME/.nvm"
-
-# Zinit
-echo "Installing Zinit..."
-ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
-if [ ! -d "$ZINIT_HOME" ]; then
-   bash -c "$(curl --fail --show-error --silent --location https://raw.githubusercontent.com/zdharma-continuum/zinit/HEAD/scripts/install.sh)"
-   echo "Zinit installed."
-else
-   echo "Zinit is already installed."
-fi
 
 # --- End Fallbacks & Other Tools ---
 
@@ -157,9 +147,6 @@ if is_ubuntu; then
 fi
 # --- End Ubuntu Specific Setup ---
 
-# --- Install Oh My Posh ---
-curl -s https://ohmyposh.dev/install.sh | bash -s
-
 # --- Check and Install Stow ---
 echo "Checking for Stow..."
 if ! command -v stow &> /dev/null; then
@@ -213,5 +200,18 @@ else
     fi
 fi
 # --- End Run Stow ---
+
+# --- Install Zinit ---
+echo "Installing Zinit..."
+ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
+if [ ! -d "$ZINIT_HOME" ]; then
+   bash -c "$(curl --fail --show-error --silent --location https://raw.githubusercontent.com/zdharma-continuum/zinit/HEAD/scripts/install.sh)"
+   echo "Zinit installed."
+else
+   echo "Zinit is already installed."
+fi
+
+# --- Install Oh My Posh ---
+curl -s https://ohmyposh.dev/install.sh | bash -s
 
 # (Rest of the script will follow)
