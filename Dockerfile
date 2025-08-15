@@ -45,10 +45,6 @@ WORKDIR /home/user/dotfiles
 RUN stow .
 WORKDIR /home/user
 
-# Set up shell environment
-RUN echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /home/user/.zshrc && \
-    echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /home/user/.bashrc
-
 # Set the default shell to zsh for the user
 RUN sudo chsh -s /usr/bin/zsh user
 
