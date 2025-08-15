@@ -18,3 +18,9 @@ When reviewing pull requests, please consider the following:
 - Modifications to the `install.sh` script should be safe and idempotent.
 - New dependencies should be added to the `Brewfile`.
 - The primary goal is to maintain a clean and synchronized set of dotfiles.
+
+## GitHub Actions Integration
+
+When running the Gemini CLI within a GitHub Actions workflow, it is important to be aware of certain limitations and security features.
+
+- **Command Substitution**: The `run_shell_command` tool in the Gemini CLI does not allow command substitution (e.g., `$(...)` or `` `...` ``) for security reasons. Prompts and scripts should be written to avoid generating commands that use this feature. For example, instead of `echo "$(some_command)"`, you should use `some_command` directly if possible, or pipe the output if necessary and supported.
