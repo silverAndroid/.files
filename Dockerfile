@@ -31,12 +31,6 @@ ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}
 # Install packages with Homebrew
 RUN brew install fzf zoxide "openjdk@21" bazelisk nvm stow
 
-# Install Zinit
-RUN bash -c "$(curl --fail --show-error --silent --location https://raw.githubusercontent.com/zdharma-continuum/zinit/HEAD/scripts/install.sh)"
-
-# Install Oh My Posh
-RUN curl -s https://ohmyposh.dev/install.sh | bash -s
-
 # Copy the dotfiles
 COPY --chown=user:user . /home/user/dotfiles
 
@@ -44,6 +38,12 @@ COPY --chown=user:user . /home/user/dotfiles
 WORKDIR /home/user/dotfiles
 RUN stow .
 WORKDIR /home/user
+
+# Install Zinit
+RUN bash -c "$(curl --fail --show-error --silent --location https://raw.githubusercontent.com/zdharma-continuum/zinit/HEAD/scripts/install.sh)"
+
+# Install Oh My Posh
+RUN curl -s https://ohmyposh.dev/install.sh | bash -s
 
 # Set the default shell to zsh for the user
 RUN sudo chsh -s /usr/bin/zsh user
