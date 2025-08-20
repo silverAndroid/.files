@@ -124,8 +124,24 @@ jobs:
             echo "EOF"
           } >> "${GITHUB_OUTPUT}"
 
+      - name: 'Check if PR is already approved'
+        id: 'check_approval'
+        env:
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          PR_NUMBER: '${{ steps.get_pr.outputs.pr_number }}'
+        run: |
+          set -euo pipefail
+          REVIEW_DECISION="$(gh pr view "${PR_NUMBER}" --json reviewDecision -q .reviewDecision)"
+          if [[ "${REVIEW_DECISION}" == "APPROVED" ]]; then
+            echo "approved=true" >> "${GITHUB_OUTPUT}"
+            echo "PR is already approved. Skipping review."
+          else
+            echo "approved=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: 'Load prompt'
         id: 'prompt'
+        if: steps.check_approval.outputs.approved == 'false'
         run: |
           {
             echo 'prompt_text<<EOF'
@@ -136,6 +152,7 @@ jobs:
       - name: 'Run Gemini PR Review'
         uses: 'google-github-actions/run-gemini-cli@v0'
         id: 'gemini_pr_review'
+        if: steps.check_approval.outputs.approved == 'false'
         env:
           GITHUB_TOKEN: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           PR_NUMBER: '${{ steps.get_pr.outputs.pr_number }}'
@@ -193,7 +210,6 @@ jobs:
               }
             }
           prompt: '${{ steps.prompt.outputs.prompt_text }}'
-
 
       - name: 'Post PR review failure comment'
         if: |-

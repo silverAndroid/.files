@@ -57,7 +57,7 @@ Context section to understand it
   * Succinctness: Aim to make code suggestions succinct, unless necessary. Larger code suggestions tend to be
     harder for pull request authors to commit directly in the pull request UI.
   * Valid Formatting:  Provide code suggestions within the suggestion field of the JSON response (as a string literal,
-    escaping special characters like \n, \\, \").  Do not include markdown code blocks in the suggestion field.
+escaping special characters like \n, \\, \").  Do not include markdown code blocks in the suggestion field.
     Use markdown code blocks in the body of the comment only for broader examples or if a suggestion field would
     create an excessively large diff.  Prefer the suggestion field for specific, targeted code changes.
   * Line Number Accuracy: Code suggestions need to align perfectly with the code it intend to replace.
@@ -78,8 +78,7 @@ Context section to understand it
     ensure that the code selected by the comment does not already do this, otherwise it's confusing let alone unnecessary.
 12. Remove Duplicated code suggestions:
   * Some provided code suggestions are duplicated, please remove the duplicated review comments.
-13. Don't Approve The Pull Request
-14. Reference all shell variables as "${VAR}" (with quotes and braces)
+13. Reference all shell variables as "${VAR}" (with quotes and braces)
 
 ### Review Criteria (Prioritized in Review)
 
@@ -169,9 +168,7 @@ Note that if you want to make a comment on the LEFT side of the UI / before the 
 to note those line numbers and the corresponding code. Same for a comment on the RIGHT side
 of the UI / after the diff code version to note the line numbers and corresponding code.
 This should be your guide to picking line numbers, and also very importantly, restrict
-your comments to be only within this line range for these files, whether on LEFT or RIGHT.
-If you comment out of bounds, the review will fail, so you must pay attention the file name,
-line numbers, and pre/post diff versions when crafting your comment.
+your comments to be only within this line range for these files, whether on LEFT or RIGHT. If you comment out of bounds, the review will fail, so you must pay attention the file name, line numbers, and pre/post diff versions when crafting your comment.
 
 Here are the patches that were implemented in the pull request, per the
 formatting above:
@@ -234,6 +231,18 @@ Once you have the information and are ready to leave a review on GitHub, post th
     - Mention overall patterns or architectural decisions
     - Highlight positive aspects of the implementation
     - Note any recurring themes across files
+
+  3.2 Making the final decision:
+    Based on the severity of your review comments, you must decide to either approve the PR or request changes.
+    - If you have left any comments with `critical` or `high` severity, you MUST request changes.
+    - If all your comments are `medium` or `low` severity, you SHOULD approve the pull request.
+    - If you have no comments, you MUST approve the pull request.
+
+    When calling `mcp__github__submit_pending_pull_request_review`, set the `event` parameter accordingly:
+    - `event: 'APPROVE'`
+    - `event: 'REQUEST_CHANGES'`
+
+    Your summary comment should also clearly state your decision.
 
 ## Final Instructions
 
