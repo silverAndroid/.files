@@ -53,26 +53,12 @@ if command -v starship >/dev/null
     starship init fish | source
 end
 
-# Dynamic Light/Dark & SSH config selector
+# Dynamic SSH config selector
 function change_starship_theme --on-event fish_prompt
-    set -l dark_mode "Dark"
-    if command -v defaults >/dev/null
-        set dark_mode (defaults read -g AppleInterfaceStyle 2>/dev/null)
-    end
     if test -n "$SSH_CONNECTION"
-        # SSH Connection
-        if test "$dark_mode" = "Dark"
-            set -gx STARSHIP_CONFIG $HOME/.config/starship-ssh.toml
-        else
-            set -gx STARSHIP_CONFIG $HOME/.config/starship-ssh-light.toml
-        end
+        set -gx STARSHIP_CONFIG $HOME/.config/starship-ssh.toml
     else
-        # Local Connection
-        if test "$dark_mode" = "Dark"
-            set -gx STARSHIP_CONFIG $HOME/.config/starship.toml
-        else
-            set -gx STARSHIP_CONFIG $HOME/.config/starship-light.toml
-        end
+        set -gx STARSHIP_CONFIG $HOME/.config/starship.toml
     end
 end
 
