@@ -1,9 +1,9 @@
 # --- Homebrew Setup ---
-if test -d /opt/homebrew
+if test -f /opt/homebrew/bin/brew
     /opt/homebrew/bin/brew shellenv | source
-else if test -d /usr/local/bin
+else if test -f /usr/local/bin/brew
     /usr/local/bin/brew shellenv | source
-else if test -d /home/linuxbrew/.linuxbrew
+else if test -f /home/linuxbrew/.linuxbrew/bin/brew
     /home/linuxbrew/.linuxbrew/bin/brew shellenv | source
 end
 
@@ -55,7 +55,10 @@ end
 
 # Dynamic Light/Dark & SSH config selector
 function change_starship_theme --on-event fish_prompt
-    set -l dark_mode (defaults read -g AppleInterfaceStyle 2>/dev/null)
+    set -l dark_mode "Dark"
+    if command -v defaults >/dev/null
+        set dark_mode (defaults read -g AppleInterfaceStyle 2>/dev/null)
+    end
     if test -n "$SSH_CONNECTION"
         # SSH Connection
         if test "$dark_mode" = "Dark"
