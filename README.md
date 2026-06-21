@@ -27,7 +27,7 @@ To use the script:
 
 The script will:
 *   Check for and install [Homebrew](https://brew.sh/) if it's not already present.
-*   Install required software packages (e.g., `oh-my-posh`, `fzf`, `zoxide`, etc.) using Homebrew.
+*   Install required software packages (e.g., `fish`, `starship`, `fnm`, `fzf`, `zoxide`, etc.) using Homebrew.
 *   Check for and install [Stow](https://www.gnu.org/software/stow/) if it's not already present.
 *   Run `stow .` from within the repository's root directory to create symbolic links (typically to your home directory, if you cloned to `~/dotfiles`).
 
@@ -51,9 +51,9 @@ This repository provides a Docker image with the complete environment pre-config
 
 4.  **Connect to the container:**
     ```bash
-    docker exec -it dotfiles /bin/zsh
+    docker exec -it dotfiles fish
     ```
-    You will now be in a `zsh` shell with the complete environment set up.
+    You will now be in a `fish` shell with the complete environment set up.
 
 ## Manual Installation
 
@@ -75,4 +75,5 @@ If you prefer to set things up manually, you will need to:
 ## Software Management
 
 *   Core software dependencies are managed via Homebrew and are installed by the `install.sh` script.
-*   Zsh plugins are managed by `zinit` as configured in `.zshrc`.
+*   Fish plugins are managed by `fisher`.
+*   Automatic Homebrew updates and upgrades run daily via LaunchAgent (macOS) or crontab (Linux).

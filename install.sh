@@ -57,7 +57,7 @@ fi
 echo "Installing Homebrew packages..."
 if command -v brew &> /dev/null; then
     echo "Using Homebrew to install packages..."
-    brew install fzf zoxide "openjdk@21" bazelisk nvm glances
+    brew install fish starship fnm fzf zoxide "openjdk@21" bazelisk glances
     echo "Homebrew package installation attempt complete."
 else
     echo "WARNING: Homebrew is not available, cannot install packages."
@@ -78,14 +78,11 @@ if ! command -v bazel > /dev/null; then
     echo "Bazelisk installed successfully!"
 fi
 
-# NVM
-if ! command -v nvm > /dev/null; then
-    echo "Installing nvm via curl as fallback..."
-    export NVM_DIR="$HOME/.nvm"
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+# FNM
+if ! command -v fnm > /dev/null; then
+    echo "Installing fnm via curl as fallback..."
+    curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "$HOME/.local/bin" --skip-shell
 fi
-# Create nvm directory, the nvm installer might create it, but -p makes it safe
-mkdir -p "$HOME/.nvm"
 
 # --- End Fallbacks & Other Tools ---
 
@@ -97,23 +94,25 @@ if is_ubuntu; then
     # Install unzip, as it is required by oh-my-posh installer
     sudo apt-get install -y unzip
 
-    # --- Install zsh and set as default shell ---
-    echo "Installing zsh..."
-    sudo apt-get install -y zsh
-    echo "Setting zsh as the default shell..."
-    if [ -x "$(command -v zsh)" ]; then
-        ZSH_PATH=$(command -v zsh)
-        # Add zsh to /etc/shells if it's not already there
-        if ! grep -Fxq "$ZSH_PATH" /etc/shells; then
-            echo "Adding $ZSH_PATH to /etc/shells..."
-            echo "$ZSH_PATH" | sudo tee -a /etc/shells
+    # --- Install fish and set as default shell ---
+    echo "Installing fish..."
+    sudo apt-add-repository -y ppa:fish-shell/release-3
+    sudo apt-get update
+    sudo apt-get install -y fish
+    echo "Setting fish as the default shell..."
+    if [ -x "$(command -v fish)" ]; then
+        FISH_PATH=$(command -v fish)
+        # Add fish to /etc/shells if it's not already there
+        if ! grep -Fxq "$FISH_PATH" /etc/shells; then
+            echo "Adding $FISH_PATH to /etc/shells..."
+            echo "$FISH_PATH" | sudo tee -a /etc/shells
         fi
-        sudo chsh -s "$ZSH_PATH" "${SUDO_USER:-$USER}"
-        echo "Default shell changed to zsh. Please log out and back in for the change to take effect."
+        sudo chsh -s "$FISH_PATH" "${SUDO_USER:-$USER}"
+        echo "Default shell changed to fish. Please log out and back in for the change to take effect."
     else
-        echo "WARNING: zsh installation seems to have failed. Skipping setting it as default shell."
+        echo "WARNING: fish installation seems to have failed. Skipping setting it as default shell."
     fi
-    # --- End zsh Setup ---
+    # --- End fish Setup ---
 
     # --- Set up Mosh Server ---
     echo "Installing Mosh server..."
@@ -197,17 +196,71 @@ else
 fi
 # --- End Run Stow ---
 
-# --- Install Zinit ---
-echo "Installing Zinit..."
-ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
-if [ ! -d "$ZINIT_HOME" ]; then
-   bash -c "$(curl --fail --show-error --silent --location https://raw.githubusercontent.com/zdharma-continuum/zinit/HEAD/scripts/install.sh)"
-   echo "Zinit installed."
+# --- Install Fisher and fzf.fish ---
+if command -v fish &> /dev/null; then
+    echo "Configuring Fisher and plugins..."
+    fish -c '
+        status job-control full
+        if not functions -q fisher
+            echo "Installing Fisher..."
+            curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher </dev/null
+        else
+            echo "Fisher is already installed."
+        end
+        echo "Installing fzf.fish plugin..."
+        fisher install PatrickF1/fzf.fish </dev/null
+    '
 else
-   echo "Zinit is already installed."
+    echo "WARNING: fish is not installed; skipping Fisher and fzf.fish plugin installation."
 fi
 
-# --- Install Oh My Posh ---
-curl -s https://ohmyposh.dev/install.sh | bash -s
-
-# (Rest of the script will follow)
+# --- Setup Homebrew Daily Update/Upgrade Cron Job ---
+echo "Setting up daily Homebrew update/upgrade job (3:00 AM)..."
+if [ "$(uname)" = "Darwin" ]; then
+    # macOS: Use LaunchAgent
+    LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
+    PLIST_FILE="$LAUNCH_AGENTS_DIR/com.user.brew-update-upgrade.plist"
+    mkdir -p "$LAUNCH_AGENTS_DIR"
+    
+    # Generate the plist file dynamically to use the correct HOME and USER
+    cat <<EOF > "$PLIST_FILE"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.user.brew-update-upgrade</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>eval "\$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv 2>/dev/null)"; brew update &amp;&amp; brew upgrade</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>$HOME/Library/Logs/brew-update-upgrade.log</string>
+    <key>StandardErrorPath</key>
+    <string>$HOME/Library/Logs/brew-update-upgrade.log</string>
+</dict>
+</plist>
+EOF
+    chmod 644 "$PLIST_FILE"
+    
+    # Load the LaunchAgent
+    echo "Loading LaunchAgent..."
+    launchctl unload "$PLIST_FILE" 2>/dev/null
+    launchctl load "$PLIST_FILE"
+    echo "Daily Homebrew update/upgrade LaunchAgent configured at $PLIST_FILE"
+else
+    # Linux: Use crontab
+    echo "Configuring crontab entry..."
+    CRON_CMD="0 3 * * * /bin/bash -c 'eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv 2>/dev/null)\"; brew update && brew upgrade' > /dev/null 2>&1"
+    (crontab -l 2>/dev/null | grep -v "brew-update-upgrade"; echo "$CRON_CMD") | crontab -
+    echo "Daily Homebrew update/upgrade crontab entry configured."
+fi
