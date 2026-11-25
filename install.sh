@@ -10,7 +10,8 @@
 # 5. Sets Fish as the default login shell on macOS and Linux.
 # 6. Installs Fisher and configured Fish plugins.
 # 7. Sets JAVA_HOME as a Fish universal variable for the current platform.
-# 8. Configures a daily 3:00 AM Homebrew update/upgrade job.
+# 8. Installs Android CLI, initializes it, installs SDK packages, and sets ANDROID_HOME (--skip-android).
+# 9. Configures a daily 3:00 AM Homebrew update/upgrade job.
 
 set -euo pipefail
 
@@ -19,6 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WITH_MOSH=false
 SKIP_SHELL=false
 SKIP_AUTOUPDATE=false
+SKIP_ANDROID=false
 
 BREW_PACKAGES=(
     stow
@@ -44,6 +46,7 @@ Options:
   --with-mosh        Install Mosh and configure UFW firewall (Ubuntu only)
   --skip-shell       Do not change the default login shell to Fish
   --skip-autoupdate  Do not configure the daily Homebrew update/upgrade job
+  --skip-android     Do not install Android CLI/SDK or set ANDROID_HOME
   -h, --help         Show this help message
 EOF
 }
@@ -59,6 +62,9 @@ parse_args() {
                 ;;
             --skip-autoupdate)
                 SKIP_AUTOUPDATE=true
+                ;;
+            --skip-android)
+                SKIP_ANDROID=true
                 ;;
             -h|--help)
                 usage
@@ -280,11 +286,133 @@ setup_java_home() {
 
     if [[ -z "$java_home_path" ]]; then
         warn "Could not find a JDK 21 installation; JAVA_HOME was not set."
-    elif command -v fish >/dev/null 2>&1; then
-        fish -c "set -Ux JAVA_HOME \"$java_home_path\""
-        info "JAVA_HOME set to $java_home_path (fish universal variable)."
     else
-        warn "fish is not installed; set JAVA_HOME=$java_home_path manually."
+        export JAVA_HOME="$java_home_path"
+        if command -v fish >/dev/null 2>&1; then
+            fish -c "set -Ux JAVA_HOME \"$java_home_path\""
+            info "JAVA_HOME set to $java_home_path (fish universal variable)."
+        else
+            warn "fish is not installed; set JAVA_HOME=$java_home_path manually."
+        fi
+    fi
+}
+
+get_android_cli_platform() {
+    case "$(uname -s) $(uname -m)" in
+        "Linux x86_64")           printf '%s\n' "linux_x86_64" ;;
+        "Linux aarch64"|"Linux arm64") printf '%s\n' "linux_arm64" ;;
+        "Darwin x86_64")          printf '%s\n' "darwin_x86_64" ;;
+        "Darwin arm64")           printf '%s\n' "darwin_arm64" ;;
+        *)                        return 1 ;;
+    esac
+}
+
+get_android_home_path() {
+    if is_macos; then
+        printf '%s\n' "$HOME/Library/Android/sdk"
+    else
+        printf '%s\n' "$HOME/Android/Sdk"
+    fi
+}
+
+setup_android_home() {
+    info "Configuring ANDROID_HOME..."
+    local android_home_path
+    android_home_path="$(get_android_home_path)"
+
+    mkdir -p "$android_home_path"
+    export ANDROID_HOME="$android_home_path"
+
+    if command -v fish >/dev/null 2>&1; then
+        fish -c "set -Ux ANDROID_HOME \"$android_home_path\""
+        info "ANDROID_HOME set to $android_home_path (fish universal variable)."
+    else
+        warn "fish is not installed; set ANDROID_HOME=$android_home_path manually."
+    fi
+}
+
+install_android_cli() {
+    # Ensure ~/.local/bin is in PATH before running Google's installer so it does not mutate shell rc files.
+    mkdir -p "$HOME/.local/bin"
+    export PATH="$HOME/.local/bin:$PATH"
+
+    if command -v android >/dev/null 2>&1; then
+        info "Android CLI is already installed ($(command -v android))."
+        return 0
+    fi
+
+    local platform
+    if ! platform="$(get_android_cli_platform)"; then
+        warn "Unsupported OS/architecture for Android CLI ($(uname -s) $(uname -m))."
+        return 1
+    fi
+
+    info "Installing Android CLI ($platform)..."
+    if ! curl -fsSL "https://dl.google.com/android/cli/latest/${platform}/install.sh" | bash; then
+        warn "Android CLI installation failed."
+        return 1
+    fi
+
+    if ! command -v android >/dev/null 2>&1; then
+        warn "Android CLI was not found in PATH after installation."
+        return 1
+    fi
+    info "Android CLI installed successfully."
+}
+
+resolve_latest_android_sdk_pkg() {
+    local android_home_path="$1"
+    local pattern="$2"
+    local regex="$3"
+
+    android --sdk="$android_home_path" sdk list --all "$pattern" 2>/dev/null \
+        | awk '{print $1}' \
+        | grep -E "$regex" \
+        | sort -V \
+        | tail -n 1 || true
+}
+
+install_android_sdk() {
+    local android_home_path="$1"
+    local -a sdk_packages=(
+        "platform-tools"
+        "cmdline-tools/latest"
+        "emulator"
+    )
+
+    local latest_platform latest_build_tools
+    latest_platform="$(resolve_latest_android_sdk_pkg "$android_home_path" "platforms/*" '^platforms/android-[0-9]+(\.[0-9]+)?$')"
+    if [[ -n "$latest_platform" ]]; then
+        sdk_packages+=("$latest_platform")
+    else
+        warn "Could not resolve latest stable Android SDK platform; skipping platform package."
+    fi
+
+    latest_build_tools="$(resolve_latest_android_sdk_pkg "$android_home_path" "build-tools/*" '^build-tools/[0-9]+\.[0-9]+\.[0-9]+$')"
+    if [[ -n "$latest_build_tools" ]]; then
+        sdk_packages+=("$latest_build_tools")
+    else
+        warn "Could not resolve latest stable Android SDK build-tools; skipping build-tools package."
+    fi
+
+    info "Installing Android SDK packages (${sdk_packages[*]}) into $android_home_path..."
+    { yes || true; } | android --sdk="$android_home_path" sdk install "${sdk_packages[@]}"
+}
+
+setup_android() {
+    if "$SKIP_ANDROID"; then
+        info "Skipping Android CLI/SDK setup (--skip-android)."
+        return 0
+    fi
+
+    setup_android_home
+
+    if install_android_cli; then
+        info "Initializing Android CLI..."
+        android --sdk="$ANDROID_HOME" init </dev/null
+        install_android_sdk "$ANDROID_HOME"
+    else
+        warn "Skipping Android SDK installation because Android CLI is unavailable."
     fi
 }
 
@@ -369,6 +497,7 @@ main() {
     setup_default_shell
     setup_fisher
     setup_java_home
+    setup_android
     setup_brew_autoupdate
 
     info "Installation complete."

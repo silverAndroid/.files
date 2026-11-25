@@ -10,12 +10,12 @@ end
 # --- PATH configuration ---
 fish_add_path $HOME/.local/bin
 
-# Android SDK
-set -gx ANDROID_HOME $HOME/Library/Android/sdk
-set -gx ANDROID_NDK_HOME $ANDROID_HOME/ndk/28.0.13004108
-fish_add_path $ANDROID_HOME/platform-tools
-fish_add_path $ANDROID_HOME/emulator
-fish_add_path $ANDROID_HOME/cmdline-tools/latest/bin
+# Android SDK: ANDROID_HOME is a fish universal variable that install.sh sets per platform.
+if set -q ANDROID_HOME
+    fish_add_path $ANDROID_HOME/platform-tools
+    fish_add_path $ANDROID_HOME/emulator
+    fish_add_path $ANDROID_HOME/cmdline-tools/latest/bin
+end
 
 # Java SDK: JAVA_HOME is a fish universal variable that install.sh sets per platform.
 
