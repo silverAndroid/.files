@@ -8,6 +8,7 @@
 # 3. Check for and install Stow if not present.
 # 4. Run stow to link the dotfiles from the current directory.
 # 5. On Ubuntu, install zsh and set it as the default shell.
+# 6. Set JAVA_HOME for the current platform.
 
 echo "Starting installation for silverAndroid/.files..."
 
@@ -213,6 +214,41 @@ if command -v fish &> /dev/null; then
 else
     echo "WARNING: fish is not installed; skipping Fisher and fzf.fish plugin installation."
 fi
+
+# --- Configure JAVA_HOME ---
+echo "Configuring JAVA_HOME..."
+JAVA_HOME_PATH=""
+JDK_PREFIX=""
+if command -v brew &> /dev/null; then
+    JDK_PREFIX="$(brew --prefix openjdk@21 2>/dev/null)"
+fi
+
+if [ "$(uname)" = "Darwin" ]; then
+    # macOS: Homebrew keeps the JDK bundle in libexec/openjdk.jdk.
+    if [ -n "$JDK_PREFIX" ] && [ -d "$JDK_PREFIX/libexec/openjdk.jdk/Contents/Home" ]; then
+        JAVA_HOME_PATH="$JDK_PREFIX/libexec/openjdk.jdk/Contents/Home"
+    elif /usr/libexec/java_home -v 21 &> /dev/null; then
+        JAVA_HOME_PATH="$(/usr/libexec/java_home -v 21)"
+    fi
+else
+    # Linux: Homebrew keeps the JDK directly in libexec.
+    if [ -n "$JDK_PREFIX" ] && [ -x "$JDK_PREFIX/libexec/bin/java" ]; then
+        JAVA_HOME_PATH="$JDK_PREFIX/libexec"
+    elif command -v java &> /dev/null; then
+        # Fallback: resolve the system java binary (e.g. /usr/lib/jvm/...).
+        JAVA_HOME_PATH="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+    fi
+fi
+
+if [ -z "$JAVA_HOME_PATH" ]; then
+    echo "WARNING: Could not find a JDK 21 installation; JAVA_HOME was not set."
+elif command -v fish &> /dev/null; then
+    fish -c "set -Ux JAVA_HOME '$JAVA_HOME_PATH'"
+    echo "JAVA_HOME set to $JAVA_HOME_PATH (fish universal variable)."
+else
+    echo "WARNING: fish is not installed; set JAVA_HOME=$JAVA_HOME_PATH manually."
+fi
+# --- End Configure JAVA_HOME ---
 
 # --- Setup Homebrew Daily Update/Upgrade Cron Job ---
 echo "Setting up daily Homebrew update/upgrade job (3:00 AM)..."

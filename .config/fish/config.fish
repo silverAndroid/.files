@@ -17,8 +17,7 @@ fish_add_path $ANDROID_HOME/platform-tools
 fish_add_path $ANDROID_HOME/emulator
 fish_add_path $ANDROID_HOME/cmdline-tools/latest/bin
 
-# Java SDK
-set -gx JAVA_HOME /Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
+# Java SDK: JAVA_HOME is a fish universal variable that install.sh sets per platform.
 
 # PNPM configuration
 set -gx PNPM_HOME $HOME/Library/pnpm
