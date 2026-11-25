@@ -1,0 +1,8 @@
+^/\.git
+^/\.gitignore$
+^/\.github
+^/\.stow-local-ignore$
+^/\.DS_Store$
+^/README\.md$
+^/install\.sh$
+^/migrate\.sh$

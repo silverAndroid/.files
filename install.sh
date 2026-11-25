@@ -1,265 +1,309 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Installation script for silverAndroid/.files
 #
-# This script will:
-# 1. Check for and install Homebrew if not present.
-# 2. Install packages from the Brewfile.
-# 3. Check for and install Stow if not present.
-# 4. Run stow to link the dotfiles from the current directory.
-# 5. On Ubuntu, install zsh and set it as the default shell.
-# 6. Set JAVA_HOME for the current platform.
+# This script:
+# 1. Installs Homebrew if missing and loads it into PATH.
+# 2. Installs core packages (including Stow and Fish) via Homebrew.
+# 3. Optionally installs Mosh and configures UFW on Ubuntu (--with-mosh).
+# 4. Links dotfiles into $HOME using GNU Stow.
+# 5. Sets Fish as the default login shell on macOS and Linux.
+# 6. Installs Fisher and configured Fish plugins.
+# 7. Sets JAVA_HOME as a Fish universal variable for the current platform.
+# 8. Configures a daily 3:00 AM Homebrew update/upgrade job.
 
-echo "Starting installation for silverAndroid/.files..."
+set -euo pipefail
 
-# --- Helper Functions ---
-is_ubuntu() {
-    [ -f /etc/os-release ] && . /etc/os-release && [ "$ID" = "ubuntu" ]
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+WITH_MOSH=false
+SKIP_SHELL=false
+SKIP_AUTOUPDATE=false
+
+BREW_PACKAGES=(
+    stow
+    fish
+    starship
+    fnm
+    fzf
+    zoxide
+    openjdk@21
+    bazelisk
+    glances
+)
+
+info() { printf '[INFO] %s\n' "$*"; }
+warn() { printf '[WARN] %s\n' "$*" >&2; }
+err()  { printf '[ERROR] %s\n' "$*" >&2; }
+
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Options:
+  --with-mosh        Install Mosh and configure UFW firewall (Ubuntu only)
+  --skip-shell       Do not change the default login shell to Fish
+  --skip-autoupdate  Do not configure the daily Homebrew update/upgrade job
+  -h, --help         Show this help message
+EOF
 }
 
-# --- Check and Install Homebrew ---
-echo "Checking for Homebrew..."
-if ! command -v brew &> /dev/null; then
-    echo "Homebrew not found. Installing Homebrew..."
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --with-mosh)
+                WITH_MOSH=true
+                ;;
+            --skip-shell)
+                SKIP_SHELL=true
+                ;;
+            --skip-autoupdate)
+                SKIP_AUTOUPDATE=true
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                err "Unknown option: $1"
+                usage >&2
+                exit 1
+                ;;
+        esac
+        shift
+    done
+}
+
+is_macos() {
+    [[ "$(uname -s)" == "Darwin" ]]
+}
+
+is_ubuntu() {
+    [[ -f /etc/os-release ]] && grep -q '^ID=ubuntu$' /etc/os-release
+}
+
+is_wsl() {
+    grep -qiE '(microsoft|wsl)' /proc/version 2>/dev/null
+}
+
+load_brew_env() {
+    local brew_bin=""
+    if [[ -x "/opt/homebrew/bin/brew" ]]; then
+        brew_bin="/opt/homebrew/bin/brew"
+    elif [[ -x "/usr/local/bin/brew" ]]; then
+        brew_bin="/usr/local/bin/brew"
+    elif [[ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
+        brew_bin="/home/linuxbrew/.linuxbrew/bin/brew"
+    fi
+
+    if [[ -n "$brew_bin" ]]; then
+        eval "$("$brew_bin" shellenv)"
+        return 0
+    fi
+    return 1
+}
+
+install_homebrew() {
+    info "Checking for Homebrew..."
+    load_brew_env || true
+
+    if command -v brew >/dev/null 2>&1; then
+        info "Homebrew is already installed ($(command -v brew))."
+        return 0
+    fi
+
+    if is_ubuntu; then
+        info "Installing Homebrew Linux prerequisites via apt..."
+        sudo apt-get update
+        sudo apt-get install -y build-essential procps curl file git
+    fi
+
+    info "Installing Homebrew..."
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    
-    # Attempt to add Homebrew to PATH for the current script execution
-    # This depends on the OS and where Homebrew installs.
-    # For macOS (Apple Silicon):
-    if [ -x "/opt/homebrew/bin/brew" ]; then
-        echo "Adding Homebrew (Apple Silicon) to PATH for this session..."
-        eval "$(/opt/homebrew/bin/brew shellenv)"
-    fi
-    # For macOS (Intel) & Linux:
-    if [ -x "/usr/local/bin/brew" ]; then
-        echo "Adding Homebrew (Intel macOS/Linux) to PATH for this session..."
-        eval "$(/usr/local/bin/brew shellenv)"
-    fi
-    # For Linuxbrew in specific home directory:
-    if [ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]; then
-        echo "Adding Homebrew (Linuxbrew) to PATH for this session..."
-        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-        sudo apt-get install build-essential procps curl file git
-    fi
 
-    if ! command -v brew &> /dev/null; then
-        echo "ERROR: Homebrew installation failed or brew is still not in PATH."
-        echo "Please install Homebrew manually and re-run this script."
+    load_brew_env || true
+    if ! command -v brew >/dev/null 2>&1; then
+        err "Homebrew installation failed or brew is still not in PATH."
+        err "Install Homebrew manually and re-run this script."
         exit 1
-    else
-        echo "Homebrew installed successfully."
     fi
-else
-    echo "Homebrew is already installed."
-fi
-# --- End Homebrew Check ---
 
-# --- Install Homebrew Packages ---
-echo "Installing Homebrew packages..."
-if command -v brew &> /dev/null; then
-    echo "Using Homebrew to install packages..."
-    brew install fish starship fnm fzf zoxide "openjdk@21" bazelisk glances
-    echo "Homebrew package installation attempt complete."
-else
-    echo "WARNING: Homebrew is not available, cannot install packages."
-fi
-# --- End Homebrew Package Installation ---
+    info "Homebrew installed successfully."
+}
 
-# --- Install Fallbacks & Other Tools ---
+install_packages() {
+    info "Installing Homebrew packages: ${BREW_PACKAGES[*]}..."
+    brew install "${BREW_PACKAGES[@]}"
 
-# Bazelisk
-if ! command -v bazel > /dev/null; then
-    echo "Installing Bazelisk via curl as fallback..."
-    curl -fsSL https://github.com/bazelbuild/bazelisk/releases/download/v1.18.0/bazelisk-1.18.0.tar.gz -o /tmp/bazelisk-1.18.0.tar.gz
-    tar -xf /tmp/bazelisk-1.18.0.tar.gz
-    chmod +x /tmp/bazelisk-1.18.0
-    mkdir -p "$HOME/bin"
-    mv /tmp/bazelisk-1.18.0 "$HOME/bin/bazelisk"
-    rm /tmp/bazelisk-1.18.0.tar.gz
-    echo "Bazelisk installed successfully!"
-fi
-
-# FNM
-if ! command -v fnm > /dev/null; then
-    echo "Installing fnm via curl as fallback..."
-    curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "$HOME/.local/bin" --skip-shell
-fi
-
-# --- End Fallbacks & Other Tools ---
-
-# --- Ubuntu Specific Setup ---
-if is_ubuntu; then
-    echo "Ubuntu detected. Running Ubuntu-specific setup..."
-    sudo apt-get update
-
-    # Install unzip, as it is required by oh-my-posh installer
-    sudo apt-get install -y unzip
-
-    # --- Install fish and set as default shell ---
-    echo "Installing fish..."
-    sudo apt-add-repository -y ppa:fish-shell/release-3
-    sudo apt-get update
-    sudo apt-get install -y fish
-    echo "Setting fish as the default shell..."
-    if [ -x "$(command -v fish)" ]; then
-        FISH_PATH=$(command -v fish)
-        # Add fish to /etc/shells if it's not already there
-        if ! grep -Fxq "$FISH_PATH" /etc/shells; then
-            echo "Adding $FISH_PATH to /etc/shells..."
-            echo "$FISH_PATH" | sudo tee -a /etc/shells
-        fi
-        sudo chsh -s "$FISH_PATH" "${SUDO_USER:-$USER}"
-        echo "Default shell changed to fish. Please log out and back in for the change to take effect."
-    else
-        echo "WARNING: fish installation seems to have failed. Skipping setting it as default shell."
+    # Fallback for fnm if Homebrew did not provide it on this platform.
+    if ! command -v fnm >/dev/null 2>&1; then
+        info "Installing fnm via upstream installer as fallback..."
+        mkdir -p "$HOME/.local/bin"
+        curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "$HOME/.local/bin" --skip-shell
     fi
-    # --- End fish Setup ---
+}
 
-    # --- Set up Mosh Server ---
-    echo "Installing Mosh server..."
+setup_ubuntu_mosh() {
+    if ! "$WITH_MOSH"; then
+        return 0
+    fi
+
+    if ! is_ubuntu; then
+        warn "--with-mosh is only supported on Ubuntu; skipping."
+        return 0
+    fi
+
+    info "Installing Mosh server..."
+    sudo apt-get update
     sudo apt-get install -y mosh
 
-    echo "Configuring firewall for Mosh..."
-    # Install ufw if not present
-    if ! command -v ufw &> /dev/null; then
-        echo "ufw not found. Installing..."
+    if is_wsl; then
+        warn "WSL detected; skipping UFW firewall configuration."
+        return 0
+    fi
+
+    info "Configuring UFW firewall for Mosh..."
+    if ! command -v ufw >/dev/null 2>&1; then
         sudo apt-get install -y ufw
     fi
 
-    # Configure ufw if available
-    if command -v ufw &> /dev/null; then
-        sudo ufw allow ssh
-        sudo ufw allow 60000:61000/udp
-        if ! sudo ufw status | grep -q "Status: active"; then
-            echo "ufw is inactive. Enabling..."
-            sudo ufw --force enable
-        fi
-        echo "ufw configured for Mosh."
-    else
-        echo "WARNING: ufw could not be installed. Skipping firewall configuration."
-        echo "Please manually open UDP ports 60000-61000 for Mosh to work."
+    sudo ufw allow ssh
+    sudo ufw allow 60000:61000/udp
+    if ! sudo ufw status | grep -q "Status: active"; then
+        info "Enabling UFW..."
+        sudo ufw --force enable
     fi
-    # --- End Mosh Server Setup ---
-fi
-# --- End Ubuntu Specific Setup ---
+    info "UFW configured for SSH and Mosh (UDP 60000-61000)."
+}
 
-# --- Check and Install Stow ---
-echo "Checking for Stow..."
-if ! command -v stow &> /dev/null; then
-    echo "Stow not found. Attempting to install Stow using Homebrew..."
-    if command -v brew &> /dev/null; then
-        brew install stow
-        if ! command -v stow &> /dev/null; then
-            echo "ERROR: Stow installation failed even with Homebrew."
-            echo "Please install Stow manually and re-run this script."
-            exit 1
-        else
-            echo "Stow installed successfully via Homebrew."
-        fi
-    else
-        echo "ERROR: Homebrew is not available, and Stow is not installed."
-        echo "Please install Homebrew and Stow manually, then re-run this script."
+link_dotfiles() {
+    if ! command -v stow >/dev/null 2>&1; then
+        err "Stow is not installed or not in PATH."
         exit 1
     fi
-else
-    echo "Stow is already installed."
-fi
-# --- End Stow Check ---
 
-# --- Run Stow ---
-echo "Running Stow to link dotfiles from the current directory ($(pwd))..."
-
-if ! command -v stow &> /dev/null; then
-    echo "ERROR: Stow command not found. Stow installation may have failed or was skipped."
-    echo "Please ensure Stow is installed and in your PATH."
-elif [ ! -f ".stow-config" ] && [ ! -d ".git" ]; then # Basic check if this looks like the dotfiles repo
-    echo "WARNING: Current directory ($(pwd)) might not be the root of the dotfiles repository (missing .git or .stow-config)."
-    echo "Please ensure you are running this script from the root of your dotfiles clone."
-    read -r -p "Proceed with 'stow .' in the current directory? (y/N): " confirm_stow
-    if [[ ! "$confirm_stow" =~ ^[yY](es)?$ ]]; then
-        echo "Stow operation cancelled by user."
-    else
-        echo "Proceeding with 'stow .' in $(pwd)..."
-        stow .
-        if [ $? -ne 0 ]; then
-            echo "ERROR: Stow command failed. Please check for conflicts or issues."
-        else
-            echo "Stow command completed successfully."
-        fi
+    info "Linking dotfiles from $SCRIPT_DIR into $HOME..."
+    if ! stow --restow --dir="$SCRIPT_DIR" --target="$HOME" .; then
+        err "Stow failed. Resolve any conflicting files in $HOME (or run ./migrate.sh) and try again."
+        exit 1
     fi
-else
-    stow .
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Stow command failed. Please check for conflicts or issues in $(pwd)."
-    else
-        echo "Stow command completed successfully."
-    fi
-fi
-# --- End Run Stow ---
+    info "Dotfiles linked successfully."
+}
 
-# --- Install Fisher and fzf.fish ---
-if command -v fish &> /dev/null; then
-    echo "Configuring Fisher and plugins..."
+get_login_shell() {
+    local target_user="${SUDO_USER:-$USER}"
+    if is_macos; then
+        dscl . -read "/Users/$target_user" UserShell 2>/dev/null | awk '{print $2}'
+    else
+        getent passwd "$target_user" 2>/dev/null | cut -d: -f7
+    fi
+}
+
+setup_default_shell() {
+    if "$SKIP_SHELL"; then
+        info "Skipping default shell setup (--skip-shell)."
+        return 0
+    fi
+
+    local fish_path
+    fish_path="$(command -v fish || true)"
+    if [[ -z "$fish_path" ]]; then
+        warn "fish is not installed; skipping default shell setup."
+        return 0
+    fi
+
+    local current_shell
+    current_shell="$(get_login_shell || true)"
+    if [[ "$current_shell" == "$fish_path" ]]; then
+        info "Default shell is already set to $fish_path."
+        return 0
+    fi
+
+    if ! grep -Fxq "$fish_path" /etc/shells; then
+        info "Adding $fish_path to /etc/shells..."
+        printf '%s\n' "$fish_path" | sudo tee -a /etc/shells >/dev/null
+    fi
+
+    local target_user="${SUDO_USER:-$USER}"
+    info "Changing default shell for $target_user to $fish_path..."
+    sudo chsh -s "$fish_path" "$target_user"
+    info "Default shell changed to Fish. Restart your terminal or log out and back in."
+}
+
+setup_fisher() {
+    if ! command -v fish >/dev/null 2>&1; then
+        warn "fish is not installed; skipping Fisher plugin setup."
+        return 0
+    fi
+
+    info "Configuring Fisher and plugins..."
     fish -c '
-        status job-control full
         if not functions -q fisher
             echo "Installing Fisher..."
-            curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher </dev/null
+            curl -fsSL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source
+            and fisher install jorgebucaran/fisher </dev/null
         else
             echo "Fisher is already installed."
         end
-        echo "Installing fzf.fish plugin..."
-        fisher install PatrickF1/fzf.fish </dev/null
+
+        if not fisher list | string match -qi "patrickf1/fzf.fish"
+            echo "Installing patrickf1/fzf.fish..."
+            fisher install PatrickF1/fzf.fish </dev/null
+        else
+            echo "patrickf1/fzf.fish is already installed."
+        end
     '
-else
-    echo "WARNING: fish is not installed; skipping Fisher and fzf.fish plugin installation."
-fi
+}
 
-# --- Configure JAVA_HOME ---
-echo "Configuring JAVA_HOME..."
-JAVA_HOME_PATH=""
-JDK_PREFIX=""
-if command -v brew &> /dev/null; then
-    JDK_PREFIX="$(brew --prefix openjdk@21 2>/dev/null)"
-fi
+setup_java_home() {
+    info "Configuring JAVA_HOME..."
+    local java_home_path=""
+    local jdk_prefix=""
 
-if [ "$(uname)" = "Darwin" ]; then
-    # macOS: Homebrew keeps the JDK bundle in libexec/openjdk.jdk.
-    if [ -n "$JDK_PREFIX" ] && [ -d "$JDK_PREFIX/libexec/openjdk.jdk/Contents/Home" ]; then
-        JAVA_HOME_PATH="$JDK_PREFIX/libexec/openjdk.jdk/Contents/Home"
-    elif /usr/libexec/java_home -v 21 &> /dev/null; then
-        JAVA_HOME_PATH="$(/usr/libexec/java_home -v 21)"
+    if command -v brew >/dev/null 2>&1; then
+        jdk_prefix="$(brew --prefix openjdk@21 2>/dev/null || true)"
     fi
-else
-    # Linux: Homebrew keeps the JDK directly in libexec.
-    if [ -n "$JDK_PREFIX" ] && [ -x "$JDK_PREFIX/libexec/bin/java" ]; then
-        JAVA_HOME_PATH="$JDK_PREFIX/libexec"
-    elif command -v java &> /dev/null; then
-        # Fallback: resolve the system java binary (e.g. /usr/lib/jvm/...).
-        JAVA_HOME_PATH="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+
+    if is_macos; then
+        if [[ -n "$jdk_prefix" && -d "$jdk_prefix/libexec/openjdk.jdk/Contents/Home" ]]; then
+            java_home_path="$jdk_prefix/libexec/openjdk.jdk/Contents/Home"
+        elif /usr/libexec/java_home -v 21 >/dev/null 2>&1; then
+            java_home_path="$(/usr/libexec/java_home -v 21)"
+        fi
+    else
+        if [[ -n "$jdk_prefix" && -x "$jdk_prefix/libexec/bin/java" ]]; then
+            java_home_path="$jdk_prefix/libexec"
+        elif command -v java >/dev/null 2>&1; then
+            java_home_path="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+        fi
     fi
-fi
 
-if [ -z "$JAVA_HOME_PATH" ]; then
-    echo "WARNING: Could not find a JDK 21 installation; JAVA_HOME was not set."
-elif command -v fish &> /dev/null; then
-    fish -c "set -Ux JAVA_HOME '$JAVA_HOME_PATH'"
-    echo "JAVA_HOME set to $JAVA_HOME_PATH (fish universal variable)."
-else
-    echo "WARNING: fish is not installed; set JAVA_HOME=$JAVA_HOME_PATH manually."
-fi
-# --- End Configure JAVA_HOME ---
+    if [[ -z "$java_home_path" ]]; then
+        warn "Could not find a JDK 21 installation; JAVA_HOME was not set."
+    elif command -v fish >/dev/null 2>&1; then
+        fish -c "set -Ux JAVA_HOME \"$java_home_path\""
+        info "JAVA_HOME set to $java_home_path (fish universal variable)."
+    else
+        warn "fish is not installed; set JAVA_HOME=$java_home_path manually."
+    fi
+}
 
-# --- Setup Homebrew Daily Update/Upgrade Cron Job ---
-echo "Setting up daily Homebrew update/upgrade job (3:00 AM)..."
-if [ "$(uname)" = "Darwin" ]; then
-    # macOS: Use LaunchAgent
-    LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
-    PLIST_FILE="$LAUNCH_AGENTS_DIR/com.user.brew-update-upgrade.plist"
-    mkdir -p "$LAUNCH_AGENTS_DIR"
-    
-    # Generate the plist file dynamically to use the correct HOME and USER
-    cat <<EOF > "$PLIST_FILE"
+setup_brew_autoupdate() {
+    if "$SKIP_AUTOUPDATE"; then
+        info "Skipping daily Homebrew update/upgrade job (--skip-autoupdate)."
+        return 0
+    fi
+
+    info "Configuring daily Homebrew update/upgrade job (3:00 AM)..."
+    if is_macos; then
+        local launch_agents_dir="$HOME/Library/LaunchAgents"
+        local logs_dir="$HOME/Library/Logs"
+        local plist_file="$launch_agents_dir/com.user.brew-update-upgrade.plist"
+        local domain="gui/$(id -u)"
+
+        mkdir -p "$launch_agents_dir" "$logs_dir"
+
+        cat <<EOF > "$plist_file"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -280,23 +324,54 @@ if [ "$(uname)" = "Darwin" ]; then
         <integer>0</integer>
     </dict>
     <key>StandardOutPath</key>
-    <string>$HOME/Library/Logs/brew-update-upgrade.log</string>
+    <string>$logs_dir/brew-update-upgrade.log</string>
     <key>StandardErrorPath</key>
-    <string>$HOME/Library/Logs/brew-update-upgrade.log</string>
+    <string>$logs_dir/brew-update-upgrade.log</string>
 </dict>
 </plist>
 EOF
-    chmod 644 "$PLIST_FILE"
-    
-    # Load the LaunchAgent
-    echo "Loading LaunchAgent..."
-    launchctl unload "$PLIST_FILE" 2>/dev/null
-    launchctl load "$PLIST_FILE"
-    echo "Daily Homebrew update/upgrade LaunchAgent configured at $PLIST_FILE"
-else
-    # Linux: Use crontab
-    echo "Configuring crontab entry..."
-    CRON_CMD="0 3 * * * /bin/bash -c 'eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv 2>/dev/null)\"; brew update && brew upgrade' > /dev/null 2>&1"
-    (crontab -l 2>/dev/null | grep -v "brew-update-upgrade"; echo "$CRON_CMD") | crontab -
-    echo "Daily Homebrew update/upgrade crontab entry configured."
-fi
+        chmod 644 "$plist_file"
+
+        launchctl bootout "$domain" "$plist_file" 2>/dev/null || true
+        if ! launchctl bootstrap "$domain" "$plist_file" 2>/dev/null; then
+            launchctl unload "$plist_file" 2>/dev/null || true
+            launchctl load "$plist_file"
+        fi
+        info "LaunchAgent configured at $plist_file."
+    else
+        if ! command -v crontab >/dev/null 2>&1; then
+            warn "crontab is not installed; skipping daily Homebrew update/upgrade job."
+            return 0
+        fi
+
+        local cron_tag="# brew-update-upgrade"
+        local cron_cmd="0 3 * * * /bin/bash -c 'eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv 2>/dev/null)\"; brew update && brew upgrade' > /dev/null 2>&1 $cron_tag"
+        local existing_cron
+        existing_cron="$(crontab -l 2>/dev/null | grep -v "$cron_tag" || true)"
+
+        if [[ -n "$existing_cron" ]]; then
+            printf '%s\n%s\n' "$existing_cron" "$cron_cmd" | crontab -
+        else
+            printf '%s\n' "$cron_cmd" | crontab -
+        fi
+        info "Crontab entry configured for daily Homebrew updates."
+    fi
+}
+
+main() {
+    parse_args "$@"
+    info "Starting installation for silverAndroid/.files..."
+
+    install_homebrew
+    install_packages
+    setup_ubuntu_mosh
+    link_dotfiles
+    setup_default_shell
+    setup_fisher
+    setup_java_home
+    setup_brew_autoupdate
+
+    info "Installation complete."
+}
+
+main "$@"

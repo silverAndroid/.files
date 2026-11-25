@@ -1,44 +1,79 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
-# Migration script from Zsh + Oh My Posh to Fish + Starship
+# Migration script from Zsh + Oh My Posh to Fish + Starship.
 #
+# This script:
+# 1. Backs up legacy Zsh/Oh-My-Posh files and conflicting target dotfiles.
+# 2. Runs install.sh (forwarding any CLI flags).
+# 3. Imports unique command history from ~/.zsh_history into Fish history.
 
-echo "Starting migration from Zsh/Oh-My-Posh to Fish/Starship..."
+set -euo pipefail
 
-# --- Backup existing configs ---
-BACKUP_DIR="$HOME/.zsh_to_fish_backup_$(date +%Y%m%d_%H%M%S)"
-echo "Creating backup directory: $BACKUP_DIR"
-mkdir -p "$BACKUP_DIR"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKUP_DIR=""
 
-backup_file() {
-    local filepath="$1"
-    if [ -f "$filepath" ] && [ ! -L "$filepath" ]; then
-        echo "Backing up $filepath to $BACKUP_DIR..."
-        mv "$filepath" "$BACKUP_DIR/"
-    elif [ -L "$filepath" ]; then
-        echo "Removing existing symlink $filepath..."
-        rm "$filepath"
+info() { printf '[INFO] %s\n' "$*"; }
+warn() { printf '[WARN] %s\n' "$*" >&2; }
+err()  { printf '[ERROR] %s\n' "$*" >&2; }
+
+ensure_backup_dir() {
+    if [[ -z "$BACKUP_DIR" ]]; then
+        BACKUP_DIR="$HOME/.zsh_to_fish_backup_$(date +%Y%m%d_%H%M%S)"
+        mkdir -p "$BACKUP_DIR"
+        info "Created backup directory: $BACKUP_DIR"
     fi
 }
 
-backup_file "$HOME/.zshrc"
-backup_file "$HOME/.omp.yaml"
-backup_file "$HOME/.config/starship.toml"
-backup_file "$HOME/.config/fish/config.fish"
+backup_path() {
+    local target="$1"
+    local rel_path="${target#"$HOME"/}"
 
-# --- Run the main installation script ---
-echo "Running install.sh..."
-if [ -f "./install.sh" ]; then
-    chmod +x ./install.sh
-    ./install.sh
-else
-    echo "ERROR: install.sh not found. Please run this script from the root of your dotfiles repository."
-    exit 1
-fi
+    if [[ -L "$target" ]]; then
+        local resolved
+        resolved="$(readlink -f "$target" 2>/dev/null || true)"
+        if [[ -n "$resolved" && "$resolved" == "$SCRIPT_DIR/"* ]]; then
+            return 0
+        fi
+        info "Removing existing symlink $target..."
+        rm "$target"
+    elif [[ -e "$target" ]]; then
+        ensure_backup_dir
+        local dest="$BACKUP_DIR/$rel_path"
+        mkdir -p "$(dirname "$dest")"
+        info "Backing up $target to $dest..."
+        mv "$target" "$dest"
+    fi
+}
 
-# --- Migrate Zsh History to Fish ---
-echo "Checking for Zsh history to migrate..."
-python3 -c '
+backup_existing_configs() {
+    local files=(
+        "$HOME/.zshrc"
+        "$HOME/.omp.yaml"
+        "$HOME/.nirc"
+        "$HOME/.config/starship.toml"
+        "$HOME/.config/starship-ssh.toml"
+        "$HOME/.config/fish/config.fish"
+    )
+
+    for filepath in "${files[@]}"; do
+        backup_path "$filepath"
+    done
+}
+
+migrate_zsh_history() {
+    local zsh_history="$HOME/.zsh_history"
+    if [[ ! -f "$zsh_history" ]]; then
+        info "No ~/.zsh_history found; skipping history migration."
+        return 0
+    fi
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        warn "python3 is not installed; skipping Zsh history migration."
+        return 0
+    fi
+
+    info "Migrating Zsh history to Fish..."
+    python3 - <<'PY'
 import os
 import re
 import time
@@ -47,97 +82,101 @@ zsh_history_path = os.path.expanduser("~/.zsh_history")
 fish_history_dir = os.path.expanduser("~/.local/share/fish")
 fish_history_path = os.path.join(fish_history_dir, "fish_history")
 
-if os.path.exists(zsh_history_path):
-    print("Migrating Zsh history to Fish...")
-    os.makedirs(fish_history_dir, exist_ok=True)
-    
-    existing_cmds = set()
-    if os.path.exists(fish_history_path):
-        try:
-            with open(fish_history_path, "r", encoding="utf-8", errors="ignore") as f:
-                for line in f:
-                    if line.startswith("- cmd:"):
-                        existing_cmds.add(line[6:].strip())
-        except Exception:
-            pass
+def unmetafy(data: bytes) -> bytes:
+    """Decode Zsh metafied bytes (0x83 followed by byte ^ 0x20)."""
+    out = bytearray()
+    i = 0
+    n = len(data)
+    while i < n:
+        if data[i] == 0x83 and i + 1 < n:
+            out.append(data[i + 1] ^ 0x20)
+            i += 2
+        else:
+            out.append(data[i])
+            i += 1
+    return bytes(out)
 
-    # Extended history format: : 1718029012:0;command
-    pattern = re.compile(r"^:\s*(\d+):\d+;(.*)$")
+def escape_fish_cmd(cmd: str) -> str:
+    """Escape backslashes and newlines for fish_history format."""
+    return cmd.replace("\\", "\\\\").replace("\n", "\\n")
 
-    imported_count = 0
-    try:
-        with open(zsh_history_path, "r", encoding="utf-8", errors="ignore") as zsh_f, \
-             open(fish_history_path, "a", encoding="utf-8") as fish_f:
-            
-            curr_cmd = []
-            curr_time = int(time.time())
-            
-            for line in zsh_f:
-                match = pattern.match(line)
-                if match:
-                    if curr_cmd:
-                        cmd_str = "".join(curr_cmd).strip()
-                        if cmd_str and cmd_str not in existing_cmds:
-                            # Escape double quotes or backslashes if needed, but standard yaml works with simple format
-                            fish_f.write(f"- cmd: {cmd_str}\n  when: {curr_time}\n")
-                            imported_count += 1
-                    
-                    curr_time = int(match.group(1))
-                    curr_cmd = [match.group(2)]
-                elif line.startswith(":"):
-                    if curr_cmd:
-                        cmd_str = "".join(curr_cmd).strip()
-                        if cmd_str and cmd_str not in existing_cmds:
-                            fish_f.write(f"- cmd: {cmd_str}\n  when: {curr_time}\n")
-                            imported_count += 1
-                    curr_time = int(time.time())
-                    curr_cmd = [line.lstrip(":").strip()]
-                else:
-                    if curr_cmd:
-                        curr_cmd.append(line)
-                    else:
-                        curr_cmd = [line]
-                        curr_time = int(time.time())
-            
-            if curr_cmd:
-                cmd_str = "".join(curr_cmd).strip()
-                if cmd_str and cmd_str not in existing_cmds:
-                    fish_f.write(f"- cmd: {cmd_str}\n  when: {curr_time}\n")
-                    imported_count += 1
+os.makedirs(fish_history_dir, exist_ok=True)
 
-        print(f"Successfully migrated {imported_count} unique command history items!")
-    except Exception as e:
-        print(f"WARNING: Failed to migrate history: {e}")
-else:
-    print("No existing Zsh history found to migrate.")
-'
+existing_cmds = set()
+if os.path.exists(fish_history_path):
+    with open(fish_history_path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if line.startswith("- cmd: "):
+                existing_cmds.add(line[7:].rstrip("\n"))
 
-# --- Change Default Shell (macOS specific, Linux is handled in install.sh) ---
-if [ "$(uname)" = "Darwin" ]; then
-    echo "Configuring Fish as the default shell on macOS..."
-    # Find fish path
-    if [ -x "/opt/homebrew/bin/fish" ]; then
-        FISH_PATH="/opt/homebrew/bin/fish"
-    elif [ -x "/usr/local/bin/fish" ]; then
-        FISH_PATH="/usr/local/bin/fish"
-    else
-        FISH_PATH=$(command -v fish)
+with open(zsh_history_path, "rb") as f:
+    raw = unmetafy(f.read()).decode("utf-8", errors="replace")
+
+# Extended history format: ": 1718029012:0;command"
+ext_pattern = re.compile(r"^:\s*(\d+):\d+;(.*)$")
+
+entries = []
+curr_lines = []
+curr_time = int(time.time())
+
+def flush_entry():
+    if not curr_lines:
+        return
+    cmd = "\n".join(curr_lines).strip()
+    if cmd:
+        entries.append((cmd, curr_time))
+
+for raw_line in raw.splitlines():
+    if curr_lines and curr_lines[-1].endswith("\\"):
+        # Continuation of a multiline Zsh history command.
+        curr_lines[-1] = curr_lines[-1][:-1]
+        curr_lines.append(raw_line)
+        continue
+
+    match = ext_pattern.match(raw_line)
+    if match:
+        flush_entry()
+        curr_time = int(match.group(1))
+        curr_lines = [match.group(2)]
+    else:
+        flush_entry()
+        curr_time = int(time.time())
+        curr_lines = [raw_line]
+
+flush_entry()
+
+imported_count = 0
+with open(fish_history_path, "a", encoding="utf-8") as fish_f:
+    for cmd, ts in entries:
+        escaped = escape_fish_cmd(cmd)
+        if escaped and escaped not in existing_cmds:
+            fish_f.write(f"- cmd: {escaped}\n  when: {ts}\n")
+            existing_cmds.add(escaped)
+            imported_count += 1
+
+print(f"[INFO] Migrated {imported_count} unique command history entries to Fish.")
+PY
+}
+
+main() {
+    info "Starting migration from Zsh/Oh-My-Posh to Fish/Starship..."
+
+    backup_existing_configs
+
+    if [[ ! -f "$SCRIPT_DIR/install.sh" ]]; then
+        err "install.sh not found in $SCRIPT_DIR."
+        exit 1
     fi
 
-    if [ -n "$FISH_PATH" ]; then
-        # Add fish to /etc/shells if not already present
-        if ! grep -Fxq "$FISH_PATH" /etc/shells; then
-            echo "Adding $FISH_PATH to /etc/shells..."
-            echo "$FISH_PATH" | sudo tee -a /etc/shells
-        fi
-        
-        # Change default shell
-        echo "Setting default shell to $FISH_PATH..."
-        sudo chsh -s "$FISH_PATH" "$USER"
-        echo "Default shell changed to Fish. Please restart your terminal/session."
-    else
-        echo "WARNING: Fish binary not found. Please make sure Fish is installed and run: chsh -s <path_to_fish>"
-    fi
-fi
+    info "Running install.sh..."
+    bash "$SCRIPT_DIR/install.sh" "$@"
 
-echo "Migration completed successfully!"
+    migrate_zsh_history
+
+    if [[ -n "$BACKUP_DIR" ]]; then
+        info "Previous configs were backed up to: $BACKUP_DIR"
+    fi
+    info "Migration completed successfully."
+}
+
+main "$@"
